@@ -1,0 +1,5 @@
+Token Calendar
+Copyright (c) 2026
+
+All rights reserved. ライセンスは未定です（配布前に所有者が決める）。
+同梱している第三者のソフトウェアのライセンスは THIRD_PARTY_NOTICES.md を参照してください。
