@@ -6,7 +6,8 @@ import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { Seg } from '../components/Seg.tsx';
-import { Loading } from '../components/Loading.tsx';
+import { useBusy } from '../busy.ts';
+import { RatioCell } from '../components/Gauge.tsx';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
 import { fmtDate, fmtInt, fmtTokens, groupLabel, windowName } from '../format.ts';
 import type { Band, RatesView } from '../../shared/api.ts';
@@ -29,6 +30,7 @@ export function RatesPage() {
   const [to, setTo] = useState(today.toISODate()!);
   const [data, setData] = useState<RatesView | null>(null);
   const [loading, setLoading] = useState(false);
+  useBusy('rates', loading);
   const [error, setError] = useState<string | null>(null);
 
   const range = useMemo(() => {
@@ -61,8 +63,9 @@ export function RatesPage() {
     const rows = data.groups.filter((g) => g.pctPerTurn);
     if (rows.length === 0) return null;
     return {
-      grid: { left: 180, right: 30, top: 10, bottom: 30 },
+      grid: { left: 180, right: 30, top: 30, bottom: 30 },
       tooltip: { trigger: 'item' },
+      legend: { top: 0, right: 10, data: [t('rates.col.perTurn'), t('rates.chart.range')] },
       xAxis: { type: 'value', name: t('rates.chart.x'), nameLocation: 'middle', nameGap: 22, axisLabel: { formatter: '{value}%' } },
       yAxis: { type: 'category', inverse: true, data: rows.map((g) => groupLabel(g.group)) },
       series: [
@@ -70,17 +73,29 @@ export function RatesPage() {
           name: t('rates.col.perTurn'),
           type: 'bar',
           data: rows.map((g) => ({ value: g.pctPerTurn!.mid, itemStyle: { opacity: g.status === 'measured' ? 0.9 : 0.4 } })),
-          label: { show: true, position: 'right', formatter: (p: { value: number }) => `${p.value.toFixed(3)}%` },
         },
         {
+          // 推定の幅（下限〜上限）を、棒の上に重ねた線と両端の短い縦線で示す
           name: t('rates.chart.range'),
-          type: 'scatter',
-          symbol: 'rect',
-          symbolSize: [2, 14],
-          data: rows.flatMap((g, i) => [
-            [g.pctPerTurn!.low, i],
-            [g.pctPerTurn!.high, i],
-          ]),
+          type: 'custom',
+          z: 10,
+          color: '#2e7d32',
+          data: rows.map((g, i) => [g.pctPerTurn!.low, g.pctPerTurn!.high, i, g.pctPerTurn!.mid]),
+          encode: { x: [0, 1], y: 2 },
+          renderItem: (_p: unknown, api: { value: (i: number) => number; coord: (v: number[]) => number[]; style: (o: object) => object }) => {
+            const [lx = 0, ly = 0] = api.coord([api.value(0), api.value(2)]);
+            const [hx = 0, hy = 0] = api.coord([api.value(1), api.value(2)]);
+            const style = { stroke: '#2e7d32', lineWidth: 2.5 };
+            return {
+              type: 'group',
+              children: [
+                { type: 'line', shape: { x1: lx, y1: ly, x2: hx, y2: hy }, style },
+                { type: 'line', shape: { x1: lx, y1: ly - 7, x2: lx, y2: ly + 7 }, style },
+                { type: 'line', shape: { x1: hx, y1: hy - 7, x2: hx, y2: hy + 7 }, style },
+                { type: 'text', style: { text: `${api.value(3).toFixed(3)}%`, x: hx + 8, y: hy, textVerticalAlign: 'middle', fill: '#555', fontSize: 12 } },
+              ],
+            };
+          },
           tooltip: { show: false },
         },
       ],
@@ -127,16 +142,11 @@ export function RatesPage() {
             </label>
           </>
         )}
-        {loading && <Loading />}
       </div>
       {!range && <div className="note warn">{t('rates.badRange')}</div>}
       {error && <div className="note warn">{error}</div>}
       {data && (
         <>
-          <div className="faint">
-            {data.windowMinutes ? t('rates.basis', { window: windowName(data.windowMinutes), from: fmtDate(data.fromMs, app.zone), to: fmtDate(data.toMs - 1, app.zone) }) : ''}{' '}
-            {data.intervals > 0 && t('rates.intervals', { n: data.intervals, dom: data.dominatedIntervals, mixed: data.mixedIntervals, unobs: data.unobservedIntervals })}
-          </div>
           {data.usageMix.length > 0 && (
             <section className="card stack">
               <h2>{t('rates.mix.title')}</h2>
@@ -166,6 +176,10 @@ export function RatesPage() {
               </table>
             </section>
           )}
+          <div className="faint">
+            {data.windowMinutes ? t('rates.basis', { window: windowName(data.windowMinutes), from: fmtDate(data.fromMs, app.zone), to: fmtDate(data.toMs - 1, app.zone) }) : ''}{' '}
+            {data.intervals > 0 && t('rates.intervals', { n: data.intervals, dom: data.dominatedIntervals, mixed: data.mixedIntervals, unobs: data.unobservedIntervals })}
+          </div>
           {data.groups.length > 0 && (
             <section className="card stack">
               <h2>{t('rates.table.title')}</h2>
@@ -198,7 +212,9 @@ export function RatesPage() {
                         <td className="r num">{band(g.pctPerMTokens, 4, '%')}</td>
                         <td className="r num">{band(g.pctPerSession, 2, '%')}</td>
                         <td className="r num">{g.tokensPerTurn != null ? fmtTokens(g.tokensPerTurn) : '—'}</td>
-                        <td className="r num">{g.relativeToBaseline != null ? `×${g.relativeToBaseline.toFixed(2)}` : '—'}</td>
+                        <td className="r">
+                <RatioCell ratio={g.relativeToBaseline} />
+              </td>
                         <td className="faint" style={{ fontSize: 12 }}>
                           {g.coefficients
                             ? t('rates.coef.values', {

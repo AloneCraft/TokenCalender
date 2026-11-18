@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import * as echarts from 'echarts/core';
-import { BarChart, LineChart, HeatmapChart, ScatterChart } from 'echarts/charts';
+import { BarChart, LineChart, HeatmapChart, ScatterChart, CustomChart } from 'echarts/charts';
 import {
   GridComponent,
   TooltipComponent,
   LegendComponent,
   DataZoomComponent,
   MarkLineComponent,
+  MarkPointComponent,
   MarkAreaComponent,
   VisualMapComponent,
   BrushComponent,
@@ -20,11 +21,13 @@ echarts.use([
   LineChart,
   HeatmapChart,
   ScatterChart,
+  CustomChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
   DataZoomComponent,
   MarkLineComponent,
+  MarkPointComponent,
   MarkAreaComponent,
   VisualMapComponent,
   BrushComponent,

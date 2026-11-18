@@ -5,7 +5,7 @@ import { commonFilter, useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { CHARTS, type ChartDef } from '../charts/registry.ts';
 import { EChart } from '../components/EChart.tsx';
-import { Loading } from '../components/Loading.tsx';
+import { useBusy } from '../busy.ts';
 import { fmtMeasure, fmtTokens } from '../format.ts';
 import type { AnalysisSeries, Measure } from '../../shared/api.ts';
 
@@ -22,6 +22,7 @@ export function AnalysisPage() {
   const [data, setData] = useState<(AnalysisSeries & { measure: Measure }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  useBusy('analysis', loading);
 
   useEffect(() => setStep(def.defaultStepMinutes), [def]);
 
@@ -96,7 +97,6 @@ export function AnalysisPage() {
         </div>
       </div>
       {error && <div className="note warn">{error}</div>}
-      {loading && <Loading block={!data} />}
       {data && option && (
         <div className={loading ? 'card is-stale' : 'card'}>
           <div className="row" style={{ justifyContent: 'space-between' }}>

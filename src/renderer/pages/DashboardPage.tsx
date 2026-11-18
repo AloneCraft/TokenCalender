@@ -7,6 +7,10 @@ import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
 import { Loading } from '../components/Loading.tsx';
+import { CurrentChats } from '../components/CurrentChats.tsx';
+import { Icon, type IconName } from '../components/Icons.tsx';
+import { BarGauge, RatioCell, RingGauge, type Tone } from '../components/Gauge.tsx';
+import { useBusy } from '../busy.ts';
 import { fmtAgo, fmtDate, fmtDateTimeWd, fmtDuration, fmtInt, fmtPct, fmtRange, groupLabel, windowName } from '../format.ts';
 import type { Band, PlanOverview, PlanWindow, ProviderPlan, SimulateResult } from '../../shared/api.ts';
 import type { Page } from '../App.tsx';
@@ -37,6 +41,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void })
     };
   }, [app.slowVersion, app.zone, app.settings.reservePct, app.settings.budgetWeekdayWeights, app.settings.demo]);
 
+  useBusy('dashboard', !data && !error);
   if (error) return <div className="note warn">{t('common.error')}: {error}</div>;
   if (!data) return <Loading block />;
 
@@ -49,6 +54,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void })
           {t('dash.updated')} {fmtAgo(data.generatedAtMs)} · {t('dash.reserve', { pct: data.reservePct })}
         </span>
       </div>
+      <CurrentChats />
       {bindingWin && <BindingBanner data={data} win={bindingWin} t={t} zone={app.zone} />}
       {data.providers.map((p) => (
         <ProviderSection key={p.provider} plan={p} windows={data.windows.filter((w) => w.provider === p.provider)} reservePct={data.reservePct} onNavigate={onNavigate} />
@@ -119,7 +125,6 @@ function ProviderSection({ plan, windows, reservePct, onNavigate }: { plan: Prov
   const now = Date.now();
   const fc = main.forecast;
   const cur = plan.capacity.find((c) => c.group === plan.currentGroup) ?? null;
-  const curRate = plan.rates.groups.find((g) => g.group === plan.currentGroup) ?? null;
   return (
     <section className="card stack" aria-label={`${name} ${windowName(main.windowMinutes)}`}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -133,8 +138,8 @@ function ProviderSection({ plan, windows, reservePct, onNavigate }: { plan: Prov
       {main.resetPassedUnconfirmed && <div className="note warn">{t('dash.resetPassed')}</div>}
 
       <div className="metrics" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
-        <Metric label={t('dash.m.remaining')} tag="official" t={t} value={fmtPct(o.remainingPct)} sub={main.local.addedPct && main.local.addedPct.mid >= 0.05 ? t('dash.m.remaining.local', { pct: bandText(main.local.addedPct, 1) }) : t('dash.m.remaining.used', { pct: fmtPct(o.usedPct) })} />
-        <Metric label={t('dash.m.reset')} tag="official" t={t} value={o.resetsAtMs ? fmtDuration(o.resetsAtMs - now) : '—'} sub={fmtDateTimeWd(o.resetsAtMs, app.zone)} />
+        <Metric label={t('dash.m.remaining')} tag="official" t={t} icon="battery" tone={o.remainingPct > 30 ? 'ok' : o.remainingPct > 10 ? 'warn' : 'danger'} valueInVisual visual={<RingGauge value={o.remainingPct} tone={o.remainingPct > 30 ? 'ok' : o.remainingPct > 10 ? 'warn' : 'danger'} label={fmtPct(o.remainingPct)}>{fmtPct(o.remainingPct)}</RingGauge>} value={fmtPct(o.remainingPct)} sub={main.local.addedPct && main.local.addedPct.mid >= 0.05 ? t('dash.m.remaining.local', { pct: bandText(main.local.addedPct, 1) }) : t('dash.m.remaining.used', { pct: fmtPct(o.usedPct) })} />
+        <Metric label={t('dash.m.reset')} tag="official" t={t} icon="clock" valueInVisual visual={<RingGauge value={o.resetsAtMs && main.cycleStartMs ? ((now - main.cycleStartMs) / Math.max(1, o.resetsAtMs - main.cycleStartMs)) * 100 : 0} tone="info" label={o.resetsAtMs ? fmtDuration(o.resetsAtMs - now) : '—'}>{o.resetsAtMs ? fmtDuration(o.resetsAtMs - now) : '—'}</RingGauge>} value={o.resetsAtMs ? fmtDuration(o.resetsAtMs - now) : '—'} sub={fmtDateTimeWd(o.resetsAtMs, app.zone)} />
         <Metric
           label={t('dash.m.today')}
           tag="plan"
@@ -146,13 +151,45 @@ function ProviderSection({ plan, windows, reservePct, onNavigate }: { plan: Prov
                 ? t('dash.m.today.over', { pct: fmtPct(-main.budget.today.leftPct, 1) })
                 : fmtPct(main.budget.today.leftPct, 1)
           }
-          tone={main.budget?.todayStatus === 'over' ? 'danger' : main.budget?.todayStatus === 'near' ? 'warn' : undefined}
+          icon="sun"
+          tone={main.budget?.todayStatus === 'over' ? 'danger' : main.budget?.todayStatus === 'near' ? 'warn' : 'ok'}
+          visual={(() => {
+            const td = main.budget?.today;
+            if (!td || td.usedPct == null) return undefined;
+            const scale = Math.max(td.budgetPct, td.usedPct) * 1.15;
+            const tn: Tone = main.budget?.todayStatus === 'over' ? 'danger' : main.budget?.todayStatus === 'near' ? 'warn' : 'ok';
+            return (
+              <BarGauge
+                max={scale}
+                fill={Math.min(td.usedPct, td.budgetPct)}
+                over={td.usedPct > td.budgetPct ? { from: td.budgetPct, to: td.usedPct } : undefined}
+                marks={[{ at: td.budgetPct, kind: 'line', tone: 'info' }]}
+                tone={tn}
+                label={`${fmtPct(td.usedPct, 1)} / ${fmtPct(td.budgetPct, 1)}`}
+              />
+            );
+          })()}
           sub={main.budget?.today ? t('dash.m.today.sub', { budget: fmtPct(main.budget.today.budgetPct, 1), used: fmtPct(main.budget.today.usedPct, 1) }) : t('dash.m.today.none')}
         />
         <Metric
           label={t('dash.m.atReset')}
           tag="estimate"
           t={t}
+          icon="flag"
+          tone={fc?.remainingAtReset ? (fc.remainingAtReset.mid <= reservePct ? 'danger' : fc.remainingAtReset.low <= reservePct ? 'warn' : 'ok') : 'info'}
+          visual={
+            fc?.remainingAtReset ? (
+              <BarGauge
+                band={{ low: fc.remainingAtReset.low, high: Math.max(fc.remainingAtReset.high, fc.remainingAtReset.low + 1.5) }}
+                marks={[
+                  { at: fc.remainingAtReset.mid, kind: 'dot', tone: fc.remainingAtReset.mid <= reservePct ? 'danger' : 'ok' },
+                  { at: reservePct, kind: 'line', tone: 'warn' },
+                ]}
+                tone={fc.remainingAtReset.mid <= reservePct ? 'danger' : fc.remainingAtReset.low <= reservePct ? 'warn' : 'ok'}
+                label={bandText(fc.remainingAtReset, 0, '%')}
+              />
+            ) : undefined
+          }
           value={fc?.remainingAtReset ? fmtPct(fc.remainingAtReset.mid) : '—'}
           sub={
             fc?.remainingAtReset
@@ -164,6 +201,7 @@ function ProviderSection({ plan, windows, reservePct, onNavigate }: { plan: Prov
           label={t('dash.m.work')}
           tag="estimate"
           t={t}
+          icon="bolt"
           value={cur?.turns ? t('dash.times', { n: bandText(cur.turns) }) : plan.overallCapacity.turns ? t('dash.times', { n: bandText(plan.overallCapacity.turns) }) : '—'}
           sub={
             cur?.turns
@@ -174,8 +212,6 @@ function ProviderSection({ plan, windows, reservePct, onNavigate }: { plan: Prov
           }
         />
       </div>
-
-      <Outlook win={main} plan={plan} reservePct={reservePct} t={t} zone={app.zone} curRate={curRate?.pctPerTurn ?? null} />
 
       <div className="layout" style={{ gridTemplateColumns: 'minmax(0, 3fr) minmax(260px, 2fr)' }}>
         <div className="stack">
@@ -219,75 +255,31 @@ function ProviderSection({ plan, windows, reservePct, onNavigate }: { plan: Prov
   );
 }
 
-function Metric({ label, value, sub, tag, t, tone }: { label: string; value: string; sub: string; tag: 'official' | 'local' | 'estimate' | 'plan'; t: T; tone?: 'warn' | 'danger' }) {
+function Metric({ label, value, sub, tag, t, tone, icon, visual, valueInVisual }: { label: string; value: string; sub: string; tag: 'official' | 'local' | 'estimate' | 'plan'; t: T; tone?: Tone; icon?: IconName; visual?: React.ReactNode; valueInVisual?: boolean }) {
   const badge = tag === 'official' ? 'ok' : tag === 'estimate' ? 'est' : tag === 'plan' ? 'accent' : '';
   return (
-    <div className="metric">
+    <div className={`metric tone-${tone ?? 'info'}${tone === 'danger' ? ' is-alert' : ''}`}>
       <div className="label">
+        {icon && <Icon name={icon} />}
         {label} <span className={`badge ${badge}`}>{t(`dash.tag.${tag}`)}</span>
       </div>
-      <div className="big num" style={tone ? { color: `var(--${tone})` } : undefined}>
-        {value}
-      </div>
+      {valueInVisual ? (
+        <div className="metric-visual">{visual}</div>
+      ) : (
+        <>
+          <div className="big num" style={tone === 'danger' || tone === 'warn' ? { color: `var(--${tone})` } : undefined}>
+            {tone === 'danger' && <Icon name="alert" size={18} />}
+            {value}
+          </div>
+          {visual && <div className="metric-visual">{visual}</div>}
+        </>
+      )}
       <div className="faint">{sub}</div>
     </div>
   );
 }
 
 /** 予測の一文と、根拠つきの提案 */
-function Outlook({ win, plan, reservePct, t, zone, curRate }: { win: PlanWindow; plan: ProviderPlan; reservePct: number; t: T; zone: string; curRate: Band | null }) {
-  const fc = win.forecast;
-  const lines: { tone: 'ok' | 'warn' | 'info'; text: string }[] = [];
-  if (fc?.exhaustion?.likelyMs) lines.push({ tone: 'warn', text: t('dash.out.exhaust', { at: fmtDateTimeWd(fc.exhaustion.likelyMs, zone), early: fmtDateTimeWd(fc.exhaustion.earliestMs, zone) }) });
-  // 持つ確率が高くないときは「持つ」と言い切らない
-  else if (fc?.finalPct && fc.probabilityLasts != null && fc.probabilityLasts < 0.8)
-    lines.push({ tone: 'warn', text: t('dash.out.borderline', { p: Math.round(fc.probabilityLasts * 100), pct: bandText(fc.remainingAtReset, 0, '%') }) });
-  else if (fc?.finalPct) lines.push({ tone: 'ok', text: t('dash.out.lasts', { pct: bandText(fc.remainingAtReset, 0, '%') }) });
-  if (fc?.recentPace?.exhaustionMs) lines.push({ tone: 'warn', text: t('dash.out.recentPace', { rate: fc.recentPace.pctPerHour.toFixed(2), at: fmtDateTimeWd(fc.recentPace.exhaustionMs, zone) }) });
-  if (win.budget?.todayStatus === 'over' && win.budget.today)
-    lines.push({ tone: 'warn', text: t('dash.out.overBudget', { over: fmtPct((win.budget.today.usedPct ?? 0) - win.budget.today.budgetPct, 1) }) });
-  // 余りそうなら、より重い使い方の余地を示す（使い切ること自体は目的にしない）
-  if (fc?.remainingAtReset && fc.remainingAtReset.low > reservePct + 10) {
-    const heavier = plan.capacity
-      .filter((c) => c.status === 'measured' && c.turns && c.group !== plan.currentGroup)
-      .map((c) => ({ c, r: plan.rates.groups.find((g) => g.group === c.group)! }))
-      .filter((x) => x.r.pctPerTurn && curRate && x.r.pctPerTurn.mid > curRate.mid)
-      .sort((a, b) => b.r.pctPerTurn!.mid - a.r.pctPerTurn!.mid)[0];
-    lines.push({
-      tone: 'info',
-      text: heavier ? t('dash.out.spare.with', { pct: fmtPct(fc.remainingAtReset.mid), group: groupLabel(heavier.c.group), n: bandText(heavier.c.turns) }) : t('dash.out.spare', { pct: fmtPct(fc.remainingAtReset.mid) }),
-    });
-  }
-  // 上限に達しそうなら、リセットまで持たせるための1日あたりの目安を示す
-  if (fc?.exhaustion?.likelyMs && win.official?.resetsAtMs) {
-    const daysLeft = Math.max(0.5, (win.official.resetsAtMs - Date.now()) / 86400000);
-    const perDay = Math.max(0, 100 - win.official.usedPct - reservePct) / daysLeft;
-    lines.push({
-      tone: 'info',
-      text: curRate
-        ? t('dash.out.keepPace.turns', { pct: perDay.toFixed(1), n: fmtInt(perDay / curRate.mid), group: groupLabel(plan.currentGroup) })
-        : t('dash.out.keepPace', { pct: perDay.toFixed(1) }),
-    });
-  }
-  // 足りなそうなら、消費の少ない組み合わせを示す
-  if (fc?.exhaustion?.likelyMs || win.budget?.todayStatus === 'over') {
-    const lighter = plan.rates.groups
-      .filter((g) => g.status === 'measured' && g.pctPerTurn && curRate && g.pctPerTurn.mid < curRate.mid * 0.8)
-      .sort((a, b) => a.pctPerTurn!.mid - b.pctPerTurn!.mid)[0];
-    if (lighter && curRate) lines.push({ tone: 'info', text: t('dash.out.lighter', { group: groupLabel(lighter.group), x: (curRate.mid / lighter.pctPerTurn!.mid).toFixed(1) }) });
-  }
-  if (lines.length === 0) return null;
-  return (
-    <div className="stack" style={{ gap: 4 }}>
-      {lines.map((l, i) => (
-        <div key={i} className={`note ${l.tone === 'warn' ? 'warn' : ''}`}>
-          {l.text}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function CycleChart({ win, t, zone, reservePct }: { win: PlanWindow; t: T; zone: string; reservePct: number }) {
   const option = useMemo<EChartsOption>(() => {
     const o = win.official!;
@@ -310,7 +302,24 @@ function CycleChart({ win, t, zone, reservePct }: { win: PlanWindow; t: T; zone:
       // 上限に達する見込みなら、その時刻で 100% に届く線にする（リセット時刻まで伸ばすと時刻を読み違えるため）
       const midEnd = fc.exhaustion?.likelyMs ? [fc.exhaustion.likelyMs, 100] : [reset, fc.finalPct.mid];
       const highEnd = fc.exhaustion?.earliestMs ? [fc.exhaustion.earliestMs, 100] : [reset, fc.finalPct.high];
-      series.push({ name: t('dash.chart.forecast'), type: 'line', data: [[now, o.usedPct], midEnd], showSymbol: false, lineStyle: { type: 'dotted', width: 2 } });
+      const mark = (coord: number[], color: string, text: string, position: string, size = 9) => ({
+        coord,
+        symbol: 'circle',
+        symbolSize: size,
+        itemStyle: { color },
+        label: { show: true, formatter: text, position, distance: position === 'bottom' ? 22 : 8, color, fontSize: 12, fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.92)', borderColor: color, borderWidth: 1, borderRadius: 4, padding: [3, 6] },
+      });
+      // 文章で説明せず、図の上に「ここで尽きる」「余裕」を直接書く
+      const marks: unknown[] = [];
+      if (fc.exhaustion?.likelyMs) {
+        marks.push(mark([fc.exhaustion.likelyMs, 100], '#b3261e', `${t('dash.chart.exhaust')}
+${fmtDateTimeWd(fc.exhaustion.likelyMs, zone)}`, 'bottom', 10));
+        if (fc.exhaustion.earliestMs && fc.exhaustion.earliestMs < fc.exhaustion.likelyMs - 3600000)
+          marks.push(mark([fc.exhaustion.earliestMs, 100], '#e08a00', `${t('dash.chart.earliest')} ${fmtDateTimeWd(fc.exhaustion.earliestMs, zone)}`, 'top', 7));
+      } else {
+        marks.push(mark([reset, fc.finalPct.mid], '#2e7d32', t('dash.chart.spare', { pct: fmtPct(fc.finalPct.mid, 0) }), 'left', 9));
+      }
+      series.push({ name: t('dash.chart.forecast'), type: 'line', data: [[now, o.usedPct], midEnd], showSymbol: false, lineStyle: { type: 'dotted', width: 2 }, markPoint: { silent: true, data: marks } });
       series.push({
         name: t('dash.chart.range'),
         type: 'line',
@@ -347,7 +356,7 @@ function CycleChart({ win, t, zone, reservePct }: { win: PlanWindow; t: T; zone:
     };
     return {
       // 右端に「上限」「目標」の名前を出す。言語によって長い（Objectif、Objetivo など）ため、余白を広めに取る
-      grid: { left: 44, right: 64, top: 44, bottom: 30 },
+      grid: { left: 44, right: 64, top: 62, bottom: 30 },
       legend: { top: 0, textStyle: { fontSize: 11 }, data: legendNames },
       tooltip: { trigger: 'axis', valueFormatter: (v: number) => (typeof v === 'number' ? `${v.toFixed(1)}%` : '') },
       xAxis: { type: 'time', min: start, max: reset, axisLabel: { formatter: (v: number) => fmtDate(v, zone) } },
@@ -424,7 +433,9 @@ function ModelTable({ plan, t }: { plan: ProviderPlan; t: T }) {
               </td>
               <td className="r num">{t('dash.times', { n: bandText(c.turns) })}</td>
               <td className="r num">{bandText(r.pctPerTurn, 3, '%')}</td>
-              <td className="r num">{r.relativeToBaseline != null ? `×${r.relativeToBaseline.toFixed(2)}` : '—'}</td>
+              <td className="r">
+                <RatioCell ratio={r.relativeToBaseline} />
+              </td>
               <td>
                 <span className={`badge ${r.status === 'measured' ? 'ok' : 'est'}`}>{t(`rates.status.${r.status}`)}</span>
               </td>

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useMsg, useT } from '../i18n/index.ts';
-import { fmtDateTime, fmtInt, localZone } from '../format.ts';
+import { fmtDateTime, fmtInt, localZone, planLabel } from '../format.ts';
+import { CLAUDE_PLANS, type ClaudePlan } from '../../shared/api.ts';
 import { isValidZoneName } from '../zone.ts';
 import { LanguagePicker } from '../components/LanguagePicker.tsx';
 
@@ -120,6 +121,18 @@ export function SettingsPage() {
       <div className="card">
         <h2>{t('set.plan')}</h2>
         <div className="form-grid">
+          <label htmlFor="s-cp">{t('set.claudePlan')}</label>
+          <span className="row">
+            <select id="s-cp" value={settings.claudePlan ?? ''} onChange={(e) => void updateSettings({ claudePlan: e.target.value === '' ? null : (e.target.value as ClaudePlan) })}>
+              <option value="">{t('plan.unset')}</option>
+              {CLAUDE_PLANS.map((p) => (
+                <option key={p} value={p}>
+                  {planLabel('claude', p)}
+                </option>
+              ))}
+            </select>
+            <span className="faint">{t('plan.priceNote')}</span>
+          </span>
           <label htmlFor="s-res">{t('set.reserve')}</label>
           <span className="row">
             <input id="s-res" inputMode="decimal" value={reserveDraft} onChange={(e) => setReserveDraft(e.target.value)} style={{ width: 70 }} />

@@ -253,6 +253,30 @@ export interface EstimateSegmentView {
   warnings: string[];
 }
 
+/** いまのチャット（プロバイダーごとの、最後に動いたチャット）の状態と判定 */
+export interface CurrentChat {
+  provider: Provider;
+  sessionId: string;
+  projectLabel: string | null;
+  startedAtMs: number;
+  lastUpdatedMs: number;
+  /** 直近 10 分以内に動いている */
+  active: boolean;
+  tokens: number;
+  requests: number;
+  inputUncached: number;
+  cacheRead: number;
+  cacheWrite: number;
+  output: number;
+  /** 直近7日の同じプロバイダーの使用量のうち、このチャットの割合（0〜100） */
+  shareOfWeekPct: number;
+  verdict: 'smooth' | 'heavy' | 'wasteful' | 'unknown';
+  vsMedian: number | null;
+  median: number | null;
+  p90: number | null;
+  cacheHit: number | null;
+}
+
 export interface EstimateView {
   windowKey: string;
   windowLabel: string;
@@ -268,6 +292,10 @@ export interface EstimateView {
   reference: { capacityTokens: Range | null; capacityCostNano: Range | null } | null;
   spreadRatio: number | null;
   costEstimateSuppressed: boolean;
+  /** 推定に使った観測のプラン（現在のプラン）。記録が無ければ null */
+  plan: string | null;
+  /** 以前のプランの観測から求めた参考の推定（現在のプランの推定には混ぜない） */
+  earlierPlans: { plan: string; fromMs: number; toMs: number; observationCount: number; capacityTokens: Range | null; capacityCostNano: Range | null }[];
   segments: EstimateSegmentView[];
   pace: {
     official: { usedPercent: number; remainingPercent: number; observedAtMs: number; ageMs: number; stale: boolean; source: string; resetsAtMs: number | null } | null;
@@ -364,6 +392,9 @@ export interface AppStatus {
   dbPath: string;
 }
 
+export const CLAUDE_PLANS = ['pro', 'max5x', 'max20x'] as const;
+export type ClaudePlan = (typeof CLAUDE_PLANS)[number];
+
 export interface Settings {
   zone: string | null;
   weekStart: 1 | 7;
@@ -380,6 +411,8 @@ export interface Settings {
   reservePct: number;
   /** 1日ごとの予算の曜日の重み（月=0…日=6）。null なら過去の実績から求める */
   budgetWeekdayWeights: number[] | null;
+  /** Claude の契約プラン（手動記録に付ける。公式の利用率にはプランが含まれないため）。空なら未設定 */
+  claudePlan: ClaudePlan | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -395,6 +428,7 @@ export const DEFAULT_SETTINGS: Settings = {
   extraSources: [],
   reservePct: 5,
   budgetWeekdayWeights: null,
+  claudePlan: null,
 };
 
 export interface BridgePreview {
@@ -425,6 +459,7 @@ export interface TokenCalendarApi {
   timeline(req: TimelineRequest): Promise<TimelineResponse>;
   dayDetail(req: DayDetailRequest): Promise<DayDetailResponse>;
   recent(req: { zone: string; pricingMode: PricingMode; limit: number }): Promise<RecentResponse>;
+  currentChats(): Promise<CurrentChat[]>;
   quotaOverview(): Promise<QuotaOverview>;
   estimate(req: { windowKey: string; pricingMode: PricingMode }): Promise<EstimateView>;
   analysis(req: AnalysisRequest): Promise<AnalysisSeries>;

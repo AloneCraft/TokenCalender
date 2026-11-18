@@ -16,6 +16,7 @@ const api: TokenCalendarApi = {
   timeline: call('timeline'),
   dayDetail: call('dayDetail'),
   recent: call('recent'),
+  currentChats: call('currentChats'),
   quotaOverview: call('quotaOverview'),
   estimate: call('estimate'),
   analysis: call('analysis'),

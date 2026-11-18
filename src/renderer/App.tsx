@@ -4,6 +4,7 @@ import { Ctx, defaultWindow, type AppCtx, type Filters } from './state.ts';
 import { LangContext, resolveLang, translate } from './i18n/index.ts';
 import { localZone, setFormatLang } from './format.ts';
 import { languageOf } from '../shared/i18n/languages.ts';
+import { useBusyPages } from './busy.ts';
 import { LanguagePicker } from './components/LanguagePicker.tsx';
 import { DEFAULT_SETTINGS, type AppStatus, type IngestStatus, type QuotaOverview, type Settings } from '../shared/api.ts';
 import { Toolbar } from './components/Toolbar.tsx';
@@ -137,6 +138,7 @@ export function App() {
   // 書式（日時・期間）の言語は描画の前にそろえる
   setFormatLang(lang);
   const t = (k: string) => translate(lang, k);
+  const busyPages = useBusyPages();
   const scanning = progress && progress.phase === 'scanning' && progress.filesTotal > 0;
 
   return (
@@ -146,7 +148,7 @@ export function App() {
           <nav className="nav" aria-label="main">
             {NAV.map((n) => (
               <button key={n.id} aria-current={page === n.id ? 'page' : undefined} onClick={() => setPage(n.id)}>
-                <span className="ico" aria-hidden="true">
+                <span className={busyPages.has(n.id) ? 'ico busy' : 'ico'} aria-hidden="true">
                   {n.ico}
                 </span>
                 {t(`nav.${n.id}`)}

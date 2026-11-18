@@ -23,6 +23,7 @@ import type {
   DayCell,
   DayDetailRequest,
   DayDetailResponse,
+  CurrentChat,
   EstimateView,
   QuotaOverview,
   RecentResponse,
@@ -33,6 +34,7 @@ import type {
   UsageTotals,
 } from '../shared/api.ts';
 import type { Provider } from '../core/model/types.ts';
+import { judgeChat, MIN_REQUESTS_TO_COMPARE } from '../core/chat/judge.ts';
 
 const DAY = 86400000;
 const FIVE_H = 5 * 3600000;
@@ -571,6 +573,46 @@ export class QueryService {
     return { items, generatedAtMs: now, liveNote: 'usage_recorded_after_response', demo: this.demo };
   }
 
+  /** プロバイダーごとに、最後に動いたチャットの状態と判定を返す。比べる相手は、そのユーザー自身の過去30日のチャット。 */
+  currentChats(): CurrentChat[] {
+    const now = this.now();
+    const out: CurrentChat[] = [];
+    const rows = this.db.prepare(
+      `SELECT session_id, count(*) n, sum(total) tok, sum(input_uncached) i, sum(cache_read) cr, sum(cache_write) cw, sum(output) o, min(ts) a, max(ts) b
+       FROM usage_events WHERE provider = ? AND ts >= ? GROUP BY session_id ORDER BY b DESC`,
+    );
+    for (const provider of ['claude', 'codex'] as const) {
+      const all = rows.all(provider, now - 30 * DAY) as { session_id: string; n: number; tok: number; i: number; cr: number; cw: number; o: number; a: number; b: number }[];
+      const cur = all[0];
+      if (!cur) continue;
+      const weekTokens = all.filter((r) => r.b >= now - 7 * DAY).reduce((a, r) => a + r.tok, 0);
+      const baseline = all.slice(1).filter((r) => r.n >= MIN_REQUESTS_TO_COMPARE).map((r) => r.tok);
+      const j = judgeChat({ tokens: cur.tok, requests: cur.n, inputUncached: cur.i, cacheRead: cur.cr, cacheWrite: cur.cw, output: cur.o }, baseline);
+      const meta = this.db.prepare('SELECT project_label FROM sessions WHERE session_key = ?').get(`${provider}:${cur.session_id}`) as { project_label: string | null } | undefined;
+      out.push({
+        provider,
+        sessionId: cur.session_id,
+        projectLabel: meta?.project_label ?? null,
+        startedAtMs: cur.a,
+        lastUpdatedMs: cur.b,
+        active: now - cur.b < 10 * 60000,
+        tokens: cur.tok,
+        requests: cur.n,
+        inputUncached: cur.i,
+        cacheRead: cur.cr,
+        cacheWrite: cur.cw,
+        output: cur.o,
+        shareOfWeekPct: weekTokens > 0 ? (cur.tok / weekTokens) * 100 : 0,
+        verdict: j.verdict,
+        vsMedian: j.vsMedian,
+        median: j.median,
+        p90: j.p90,
+        cacheHit: j.cacheHit,
+      });
+    }
+    return out;
+  }
+
   private priceRows(rows: EventRow[], engine: PricingEngine, mode: PricingMode): EventRow[] {
     for (const r of rows) {
       const p = engine.price(
@@ -670,6 +712,8 @@ export class QueryService {
       reference: null,
       spreadRatio: null,
       costEstimateSuppressed: false,
+      plan: null,
+      earlierPlans: [],
       segments: [],
       pace: {
         official: null,
@@ -689,7 +733,7 @@ export class QueryService {
     };
     if (!parts.windowMinutes) return empty;
     // 推定に使う観測は直近8週間に限る（使い方の変化を反映し、問い合わせを軽くするため）
-    const obs = loadQuota(this.db, {
+    let obs = loadQuota(this.db, {
       provider: parts.provider as Provider,
       accountKey: parts.accountKey,
       limitId: parts.limitId,
@@ -701,14 +745,19 @@ export class QueryService {
       obs.push({ ...latestObs, id: -1, note: null });
     }
     if (obs.length === 0) return empty;
-    const fromMs = obs[0]!.observedAtMs - (parts.windowMinutes * 60000);
+    // プランが違うと枠の大きさが違う。推定は「現在のプラン」の観測だけで行い、以前のプランは別に参考として出す。
+    const runs = splitByPlan(obs);
+    const currentRun = runs[runs.length - 1]!;
+    const allObs = obs;
+    obs = currentRun.obs;
+    const fromMs = allObs[0]!.observedAtMs - (parts.windowMinutes * 60000);
     const cycles = buildCycles(obs, parts.windowMinutes, { extrapolateToMs: now + 1 });
     // 観測時刻と1時間ごとの区切りを境界にした小区間を SQL で合計する（イベントを1件ずつ読み込まない）。
     // 推定に使う区間・ペース・重ね図は、すべてこの境界の上で正確に求められる。
     const viewFrom = Math.max(fromMs, now - 14 * DAY);
     const hourly = fixedBuckets(0, 3600000, viewFrom, now + 1, 'h');
     const bset = boundarySet(
-      obs.map((o) => o.observedAtMs),
+      allObs.map((o) => o.observedAtMs),
       hourly.map((h) => h.startMs),
       hourly.map((h) => h.endMs),
       [fromMs, now + 1],
@@ -735,6 +784,10 @@ export class QueryService {
       mixedBillingTokens: pMixed.sum(a, b),
     });
     const est = estimateCapacity(obs, cycles, local);
+    const earlierPlans = runs.slice(0, -1).filter((r) => r.obs.length >= 2).map((r) => {
+      const e = estimateCapacity(r.obs, buildCycles(r.obs, parts.windowMinutes!, { extrapolateToMs: r.obs[r.obs.length - 1]!.observedAtMs + 1 }), local);
+      return { plan: r.plan ?? 'unknown', fromMs: r.obs[0]!.observedAtMs, toMs: r.obs[r.obs.length - 1]!.observedAtMs, observationCount: r.obs.length, capacityTokens: e.capacityTokens, capacityCostNano: e.capacityCostNano };
+    });
     // ペース: 最後の観測と同じ周期の観測
     const lastObs = obs[obs.length - 1]!;
     const cyc = cycles.find((c) => lastObs.observedAtMs >= c.startMs && lastObs.observedAtMs < c.endMs);
@@ -765,6 +818,8 @@ export class QueryService {
       reference: est.reference,
       spreadRatio: est.spreadRatio,
       costEstimateSuppressed: est.costEstimateSuppressed,
+      plan: currentRun.plan,
+      earlierPlans,
       segments: est.segments.map((s) => ({
         startMs: s.startMs,
         endMs: s.endMs,
@@ -937,6 +992,19 @@ export class QueryService {
 }
 
 const EMPTY_CUM: CumulativeCell = { cycleKnown: false, cycleEstimated: false, prior: null, increment: null, cumulative: null, resetInBucket: false, oldCycleUsage: 0 };
+
+/** 観測を、プランが同じ連続した範囲ごとに分ける。プランの記録が無い観測は、そのとき続いている範囲に含める。 */
+export function splitByPlan<T extends { planType: string | null }>(obs: T[]): { plan: string | null; obs: T[] }[] {
+  const runs: { plan: string | null; obs: T[] }[] = [];
+  for (const o of obs) {
+    const last = runs[runs.length - 1];
+    if (last && (o.planType == null || last.plan == null || o.planType === last.plan)) {
+      last.obs.push(o);
+      if (last.plan == null) last.plan = o.planType;
+    } else runs.push({ plan: o.planType, obs: [o] });
+  }
+  return runs;
+}
 
 function pickCum(c: CumulativeCell): CumulativeCell {
   return {

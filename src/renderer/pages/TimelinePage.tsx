@@ -3,7 +3,7 @@ import { api } from '../api.ts';
 import { commonFilter, useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { Seg } from '../components/Seg.tsx';
-import { Loading } from '../components/Loading.tsx';
+import { useBusy } from '../busy.ts';
 import { TimelineChart } from '../components/TimelineChart.tsx';
 import { fmtMeasure, fmtTokens, windowKeyLabel } from '../format.ts';
 import type { Measure, TimelineGranularity, TimelineResponse } from '../../shared/api.ts';
@@ -25,6 +25,7 @@ export function TimelinePage() {
   const [data, setData] = useState<(TimelineResponse & { measure: Measure }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  useBusy('timeline', loading);
 
   const provider = filters.provider;
   const w5h = provider !== 'both' ? (quota?.windows.find((w) => w.provider === provider && w.windowMinutes === 300)?.key ?? null) : null;
@@ -105,7 +106,6 @@ export function TimelinePage() {
         {kind === 'calendar_week' && <div className="faint" style={{ marginTop: 6 }}>{t('tl.weekNote')}</div>}
       </div>
       {error && <div className="note warn">{error}</div>}
-      {loading && <Loading block={!data} />}
       {data && (
         <div className={loading ? 'card is-stale' : 'card'}>
           <div className="row" style={{ justifyContent: 'space-between' }}>

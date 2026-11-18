@@ -155,3 +155,12 @@ export const PROVIDER_COLOR: Record<string, string> = { claude: '#d97757', codex
 export function colorFor(key: string, index: number): string {
   return PROVIDER_COLOR[key] ?? PALETTE[index % PALETTE.length]!;
 }
+
+/** 契約プランの表示名（金額は月額の目安）。名前が分からないプランは、記録された名前をそのまま出す。 */
+const PLAN_LABELS: Record<string, Record<string, string>> = {
+  codex: { free: 'Free', plus: 'Plus ($20)', prolite: 'Pro Lite ($100)', pro: 'Pro ($200)' },
+  claude: { pro: 'Pro ($20)', max5x: 'Max 5x ($100)', max20x: 'Max 20x ($200)' },
+};
+export function planLabel(provider: string, plan: string): string {
+  return PLAN_LABELS[provider]?.[plan] ?? plan;
+}

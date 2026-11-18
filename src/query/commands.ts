@@ -60,6 +60,8 @@ export function handleCommand(method: string, params: unknown, ctx: CommandConte
         limit: v.int(o?.limit ?? 5, 'limit', 1, 20),
       });
     }
+    case 'currentChats':
+      return service.currentChats();
     case 'quotaOverview':
       return service.quotaOverview();
     case 'estimate': {
@@ -91,7 +93,8 @@ export function handleCommand(method: string, params: unknown, ctx: CommandConte
         obsKey: `manual:${m.provider}:${m.limitId}:${m.windowMinutes}:${m.observedAtMs}`,
         provider: m.provider,
         accountKey: m.accountKey,
-        planType: null,
+        // Claude の公式利用率にはプランが含まれないので、設定のプランを付ける（Codex は付けない）
+        planType: m.provider === 'claude' ? readSettings(db).claudePlan : null,
         limitId: m.limitId,
         windowKind: windowKindFromMinutes(m.windowMinutes),
         windowMinutes: m.windowMinutes,

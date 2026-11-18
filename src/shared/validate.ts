@@ -14,6 +14,7 @@ import type {
   SimulateRequest,
   TimelineRequest,
 } from './api.ts';
+import { CLAUDE_PLANS } from './api.ts';
 import { LANG_CODES } from './i18n/languages.ts';
 
 export class ValidationError extends Error {}
@@ -198,6 +199,7 @@ export function settingsPatch(v: unknown): Partial<Settings> {
       out.budgetWeekdayWeights = (o.budgetWeekdayWeights as unknown[]).map((x, i) => num(x, `budgetWeekdayWeights[${i}]`, 0, 10));
     }
   }
+  if ('claudePlan' in o) out.claudePlan = o.claudePlan === null ? null : oneOf(o.claudePlan, 'claudePlan', CLAUDE_PLANS);
   if ('extraSources' in o) {
     if (!Array.isArray(o.extraSources) || o.extraSources.length > 50) fail('extraSources is invalid');
     out.extraSources = o.extraSources.map((x, i) => {

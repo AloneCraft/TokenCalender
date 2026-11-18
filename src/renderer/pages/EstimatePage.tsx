@@ -3,7 +3,7 @@ import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
-import { fmtAgo, fmtDateTime, fmtDuration, fmtMoney, fmtPct, fmtRange, fmtTokens, roundSig, windowName } from '../format.ts';
+import { planLabel, fmtAgo, fmtDateTime, fmtDuration, fmtMoney, fmtPct, fmtRange, fmtTokens, roundSig, windowName } from '../format.ts';
 import type { EstimateView, Range } from '../../shared/api.ts';
 import { ManualEntry } from '../components/ManualEntry.tsx';
 
@@ -135,6 +135,20 @@ export function EstimatePage() {
                 </div>
               </div>
               <dl className="kv" style={{ marginTop: 10 }}>
+                <dt>{t('est.plan')}</dt>
+                <dd>
+                  {est.plan ? planLabel(est.windowKey.split('|')[0]!, est.plan) : '—'} <span className="faint">{t('est.planOnly')} {t('plan.priceNote')}</span>
+                </dd>
+                {est.earlierPlans.length > 0 && <dt>{t('est.planEarlier')}</dt>}
+                {est.earlierPlans.length > 0 && (
+                  <dd>
+                    {est.earlierPlans.map((e) => (
+                      <div key={e.plan + e.fromMs}>
+                        {planLabel(est.windowKey.split('|')[0]!, e.plan)}: {range(e.capacityTokens, 'tokens')} <span className="faint">({fmtRange(fmtDateTime(e.fromMs, zone), fmtDateTime(e.toMs, zone), true)})</span>
+                      </div>
+                    ))}
+                  </dd>
+                )}
                 <dt>{t('est.observations')}</dt>
                 <dd>{est.observationCount.toLocaleString()}</dd>
                 <dt>{t('est.period')}</dt>

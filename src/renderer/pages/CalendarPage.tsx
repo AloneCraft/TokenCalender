@@ -10,7 +10,7 @@ import { RecentPanel } from '../components/RecentPanel.tsx';
 import { QuotaPanel } from '../components/QuotaPanel.tsx';
 import { DayDetail } from '../components/DayDetail.tsx';
 import { TimelineChart } from '../components/TimelineChart.tsx';
-import { Loading } from '../components/Loading.tsx';
+import { useBusy } from '../busy.ts';
 
 interface View {
   measure: CalendarRequest['measure'];
@@ -26,6 +26,7 @@ export function CalendarPage({ onOpenEstimate }: { onOpenEstimate: () => void })
   const [data, setData] = useState<(CalendarResponse & { view: View }) | null>(null);
   const [tl, setTl] = useState<(TimelineResponse & { view: View }) | null>(null);
   const [loading, setLoading] = useState(false);
+  useBusy('calendar', loading);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -105,7 +106,6 @@ export function CalendarPage({ onOpenEstimate }: { onOpenEstimate: () => void })
     <div className="layout">
       <div className="stack">
         {error && <div className="note warn">{error}</div>}
-        {loading && <Loading />}
         {filters.unit === 'day' && data && (
           <div className="card">
             <BarDefs />
