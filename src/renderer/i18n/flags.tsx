@@ -74,10 +74,123 @@ function SouthKorea(): ReactElement {
   );
 }
 
+/** 五芒星の頂点（中心 cx,cy、外側の半径 r、回転 rot 度。0 度で上向き） */
+function starPoints(cx: number, cy: number, r: number, rot = 0): string {
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const rad = r * (i % 2 === 0 ? 1 : 0.382);
+    const a = ((rot + i * 36 - 90) * Math.PI) / 180;
+    pts.push(`${(cx + rad * Math.cos(a)).toFixed(2)},${(cy + rad * Math.sin(a)).toFixed(2)}`);
+  }
+  return pts.join(' ');
+}
+
+/** 五星紅旗: 赤地に、左上の大きな黄色い星と、それを囲む4つの小さな星 */
+function China(): ReactElement {
+  return (
+    <>
+      <rect width={W} height={H} fill="#de2910" />
+      <polygon points={starPoints(5, 5, 3)} fill="#ffde00" />
+      <polygon points={starPoints(10, 2, 1, 20)} fill="#ffde00" />
+      <polygon points={starPoints(12, 4, 1, 45)} fill="#ffde00" />
+      <polygon points={starPoints(12, 7, 1, 20)} fill="#ffde00" />
+      <polygon points={starPoints(10, 9, 1, 0)} fill="#ffde00" />
+    </>
+  );
+}
+
+/** 青天白日満地紅旗: 赤地、左上の青い四角に、白い太陽（円と12本の光） */
+function Taiwan(): ReactElement {
+  const rays: ReactElement[] = [];
+  for (let i = 0; i < 12; i++) {
+    rays.push(<rect key={i} x={7.5 - 0.5} y={5 - 4} width={1} height={2} fill="#fff" transform={`rotate(${i * 30} 7.5 5)`} />);
+  }
+  return (
+    <>
+      <rect width={W} height={H} fill="#fe0000" />
+      <rect width={W / 2} height={H / 2} fill="#000095" />
+      {rays}
+      <circle cx={7.5} cy={5} r={2.6} fill="#000095" />
+      <circle cx={7.5} cy={5} r={2.2} fill="#fff" />
+    </>
+  );
+}
+
+/** スペイン: 赤・黄・赤の横線（1:2:1）。国章は小さすぎるため省く */
+function Spain(): ReactElement {
+  return (
+    <>
+      <rect width={W} height={H} fill="#aa151b" />
+      <rect y={H / 4} width={W} height={H / 2} fill="#f1bf00" />
+    </>
+  );
+}
+
+/** ブラジル: 緑地に黄色い菱形、青い円と白い帯 */
+function Brazil(): ReactElement {
+  const cx = W / 2;
+  const cy = H / 2;
+  return (
+    <>
+      <rect width={W} height={H} fill="#009c3b" />
+      <polygon points={`${cx},1.6 ${W - 2.6},${cy} ${cx},${H - 1.6} 2.6,${cy}`} fill="#ffdf00" />
+      <circle cx={cx} cy={cy} r={4.2} fill="#002776" />
+      <path d={`M ${cx - 4.1} ${cy - 0.6} Q ${cx} ${cy - 2.4} ${cx + 4.1} ${cy + 0.9}`} stroke="#fff" strokeWidth={0.9} fill="none" />
+    </>
+  );
+}
+
+function France(): ReactElement {
+  return (
+    <>
+      <rect width={W} height={H} fill="#fff" />
+      <rect width={W / 3} height={H} fill="#0055a4" />
+      <rect x={(W * 2) / 3} width={W / 3} height={H} fill="#ef4135" />
+    </>
+  );
+}
+
+function Germany(): ReactElement {
+  return (
+    <>
+      <rect width={W} height={H / 3} fill="#000" />
+      <rect y={H / 3} width={W} height={H / 3} fill="#dd0000" />
+      <rect y={(H * 2) / 3} width={W} height={H / 3} fill="#ffce00" />
+    </>
+  );
+}
+
+function Russia(): ReactElement {
+  return (
+    <>
+      <rect width={W} height={H / 3} fill="#fff" />
+      <rect y={H / 3} width={W} height={H / 3} fill="#0039a6" />
+      <rect y={(H * 2) / 3} width={W} height={H / 3} fill="#d52b1e" />
+    </>
+  );
+}
+
+function Ukraine(): ReactElement {
+  return (
+    <>
+      <rect width={W} height={H / 2} fill="#0057b7" />
+      <rect y={H / 2} width={W} height={H / 2} fill="#ffd700" />
+    </>
+  );
+}
+
 const FLAGS: Record<FlagId, () => ReactElement> = {
   jp: Japan,
   us: UnitedStates,
   kr: SouthKorea,
+  cn: China,
+  tw: Taiwan,
+  es: Spain,
+  br: Brazil,
+  fr: France,
+  de: Germany,
+  ru: Russia,
+  ua: Ukraine,
 };
 
 /** 国旗の絵。説明は隣の言語名が担うため、読み上げでは飛ばす（aria-hidden） */

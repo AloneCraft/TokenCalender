@@ -11,10 +11,20 @@ export function openDatabase(path: string, opts: { readOnly?: boolean } = {}): D
   db.exec('PRAGMA cache_size = -65536;');
   db.exec('PRAGMA mmap_size = 268435456;');
   if (!opts.readOnly) {
-    db.exec('PRAGMA journal_mode = WAL;');
-    db.exec('PRAGMA synchronous = NORMAL;');
-    db.exec('PRAGMA foreign_keys = ON;');
-    migrate(db);
+    // 新しい DB を複数のスレッドが同時に初期化すると、busy_timeout が効かない形の
+    // 「database is locked」が起きる（読み取りから書き込みへの格上げの競合）。短く待って再試行する。
+    for (let attempt = 0; ; attempt++) {
+      try {
+        db.exec('PRAGMA journal_mode = WAL;');
+        db.exec('PRAGMA synchronous = NORMAL;');
+        db.exec('PRAGMA foreign_keys = ON;');
+        migrate(db);
+        break;
+      } catch (e) {
+        if (attempt >= 40 || !/locked|busy/i.test(String(e))) throw e;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 + attempt * 5);
+      }
+    }
   }
   return db;
 }

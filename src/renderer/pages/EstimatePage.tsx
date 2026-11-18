@@ -3,7 +3,7 @@ import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
-import { fmtAgo, fmtDateTime, fmtDuration, fmtMoney, fmtPct, fmtTokens, roundSig, windowName } from '../format.ts';
+import { fmtAgo, fmtDateTime, fmtDuration, fmtMoney, fmtPct, fmtRange, fmtTokens, roundSig, windowName } from '../format.ts';
 import type { EstimateView, Range } from '../../shared/api.ts';
 import { ManualEntry } from '../components/ManualEntry.tsx';
 
@@ -69,7 +69,7 @@ export function EstimatePage() {
   }, [est, t]);
 
   const range = (r: Range | null, kind: 'tokens' | 'cost') =>
-    r ? (kind === 'cost' ? `${fmtMoney(roundSig(r.low), money)}〜${fmtMoney(roundSig(r.high), money)}` : `${fmtTokens(roundSig(r.low))}〜${fmtTokens(roundSig(r.high))}`) : '—';
+    r ? (kind === 'cost' ? fmtRange(fmtMoney(roundSig(r.low), money), fmtMoney(roundSig(r.high), money)) : fmtRange(fmtTokens(roundSig(r.low)), fmtTokens(roundSig(r.high)))) : '—';
 
   const capT = est?.capacityTokens ?? est?.reference?.capacityTokens ?? null;
   const capC = est?.capacityCostNano ?? est?.reference?.capacityCostNano ?? null;
@@ -139,7 +139,7 @@ export function EstimatePage() {
                 <dd>{est.observationCount.toLocaleString()}</dd>
                 <dt>{t('est.period')}</dt>
                 <dd>
-                  {fmtDateTime(est.periodFromMs, zone)} 〜 {fmtDateTime(est.periodToMs, zone)}
+                  {fmtRange(fmtDateTime(est.periodFromMs, zone), fmtDateTime(est.periodToMs, zone), true)}
                 </dd>
                 <dt>{t('est.segments')}</dt>
                 <dd>
@@ -188,7 +188,7 @@ export function EstimatePage() {
                   .map((s) => (
                     <tr key={`${s.startMs}-${s.endMs}`}>
                       <td>
-                        {fmtDateTime(s.startMs, zone)}〜{fmtDateTime(s.endMs, zone)}
+                        {fmtRange(fmtDateTime(s.startMs, zone), fmtDateTime(s.endMs, zone))}
                         <div className="faint">
                           {s.p1}% → {s.p2}%
                         </div>
@@ -196,7 +196,7 @@ export function EstimatePage() {
                       <td className="r">{s.deltaPct}</td>
                       <td className="r">{fmtTokens(s.tokens)}</td>
                       <td className="r">{fmtMoney(s.costNano, money)}</td>
-                      <td className="r">{s.capacityCostNano ? `${fmtMoney(roundSig(s.capacityCostNano.low), money)}〜${fmtMoney(roundSig(s.capacityCostNano.high), money)}` : '—'}</td>
+                      <td className="r">{s.capacityCostNano ? fmtRange(fmtMoney(roundSig(s.capacityCostNano.low), money), fmtMoney(roundSig(s.capacityCostNano.high), money)) : '—'}</td>
                       <td>
                         {s.adopted ? <span className="badge ok">{t('est.adopted')}</span> : <span className="badge">{t('est.excluded')}</span>}
                         {[...s.exclusions, ...s.warnings].map((r) => (

@@ -29,7 +29,6 @@ async function mainT(): Promise<(key: string, vars?: Record<string, string | num
 app.setName(APP_NAME);
 if (!app.requestSingleInstanceLock()) app.quit();
 
-// 開発・試験では TOKEN_CALENDAR_DATA_DIR でデータの置き場所を変えられる
 const dataDir = process.env.TOKEN_CALENDAR_DATA_DIR ?? app.getPath('userData');
 mkdirSync(dataDir, { recursive: true });
 const dbPath = join(dataDir, 'token-calendar.sqlite');

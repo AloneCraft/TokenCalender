@@ -51,7 +51,18 @@ export class WorkerHub {
       if (m.error !== undefined) p.reject(new Error(m.error));
       else p.resolve(m.result);
     });
-    this.query.on('error', (e) => this.opts.onError(String(e)));
+    // 問い合わせスレッドが落ちたら、待っている呼び出しを失敗として返す（画面が読み込み中のまま止まらないように）
+    const failAll = (reason: string): void => {
+      for (const [id, p] of this.pending) {
+        this.pending.delete(id);
+        p.reject(new Error(reason));
+      }
+    };
+    this.query.on('error', (e) => {
+      this.opts.onError(String(e));
+      failAll(String(e));
+    });
+    this.query.on('exit', (code) => failAll(`query worker exited (${code})`));
   }
 
   private startIngest(): void {

@@ -54,12 +54,30 @@ describe('OS の言語からの選び方', () => {
   });
 
   it('優先順に見て、最初に登録のある言語を選ぶ', () => {
-    expect(matchOsLanguage(['fr-FR', 'ja-JP', 'en-US'])).toBe('ja');
+    // it・tr は未登録。先頭から順に探し、最初に当たった ja を選ぶ
+    expect(matchOsLanguage(['it-IT', 'tr-TR', 'ja-JP', 'en-US'])).toBe('ja');
+    expect(matchOsLanguage(['fr-FR', 'ja-JP'])).toBe('fr');
   });
 
   it('登録の無い言語だけなら英語にする', () => {
-    expect(matchOsLanguage(['fr-FR', 'de-DE'])).toBe(FALLBACK_LANG);
+    expect(matchOsLanguage(['it-IT', 'tr-TR'])).toBe(FALLBACK_LANG);
     expect(matchOsLanguage([])).toBe(FALLBACK_LANG);
+  });
+
+  it('中国語: 簡体字・繁体字を、OS が返す地域つきのタグ（zh-CN・zh-TW など）から選ぶ', () => {
+    for (const tag of ['zh-CN', 'zh-SG', 'zh-Hans', 'zh-Hans-CN', 'zh']) expect(matchOsLanguage([tag]), tag).toBe('zh-Hans');
+    for (const tag of ['zh-TW', 'zh-HK', 'zh-MO', 'zh-Hant', 'zh-Hant-TW']) expect(matchOsLanguage([tag]), tag).toBe('zh-Hant');
+  });
+
+  it('ポルトガル語: ブラジル版の辞書を、pt の全地域（pt-PT など）で使う', () => {
+    for (const tag of ['pt-BR', 'pt-PT', 'pt']) expect(matchOsLanguage([tag]), tag).toBe('pt-BR');
+  });
+
+  it('ほかの言語: 言語の部分で選ぶ（es-MX → es、de-AT → de、uk-UA → uk）', () => {
+    expect(matchOsLanguage(['es-MX'])).toBe('es');
+    expect(matchOsLanguage(['de-AT'])).toBe('de');
+    expect(matchOsLanguage(['uk-UA'])).toBe('uk');
+    expect(matchOsLanguage(['ru-RU'])).toBe('ru');
   });
 
   it('設定が system なら OS に合わせ、言語を選んでいればそれを使う', () => {
@@ -81,6 +99,31 @@ describe('翻訳', () => {
     expect(translate('en', 'src.unreadable', { count: 3 })).toBe('3 unreadable files');
     // 複数形の文が無い言語では、元の文を使う
     expect(translate('ja', 'src.unreadable', { count: 1 })).toBe('読めないファイル 1');
+  });
+
+  it('ロシア語・ウクライナ語: 複数形が3つの形（1・2〜4・5以上）に分かれる', () => {
+    // 1, 21 → one / 2〜4, 22〜24 → few / 0, 5〜20, 25 → many
+    expect(translate('ru', 'src.unreadable', { count: 1 })).toBe('1 нечитаемый файл');
+    expect(translate('ru', 'src.unreadable', { count: 21 })).toBe('21 нечитаемый файл');
+    expect(translate('ru', 'src.unreadable', { count: 3 })).toBe('3 нечитаемых файла');
+    expect(translate('ru', 'src.unreadable', { count: 5 })).toBe('5 нечитаемых файлов');
+    expect(translate('ru', 'src.unreadable', { count: 11 })).toBe('11 нечитаемых файлов');
+    expect(translate('uk', 'src.unreadable', { count: 2 })).toBe('2 нечитабельні файли');
+    expect(translate('uk', 'src.unreadable', { count: 7 })).toBe('7 нечитабельних файлів');
+  });
+
+  it('複数形のある言語（英語・フランス語・ドイツ語・スペイン語・ポルトガル語）でも単数と複数を分ける', () => {
+    expect(translate('de', 'src.unreadable', { count: 1 })).toBe('1 nicht lesbare Datei');
+    expect(translate('de', 'src.unreadable', { count: 4 })).toBe('4 nicht lesbare Dateien');
+    expect(translate('es', 'src.unreadable', { count: 1 })).toBe('1 archivo ilegible');
+    expect(translate('pt-BR', 'src.unreadable', { count: 2 })).toBe('2 arquivos ilegíveis');
+    // フランス語は 0 も単数
+    expect(translate('fr', 'src.unreadable', { count: 0 })).toBe('0 fichier illisible');
+  });
+
+  it('文字の種類で辞書が違う中国語（簡体字・繁体字）が、同じ鍵に別の文を持つ', () => {
+    expect(translate('zh-Hans', 'nav.settings')).toBe('设置');
+    expect(translate('zh-Hant', 'nav.settings')).toBe('設定');
   });
 
   it('辞書に無い鍵は、鍵そのものを返す（画面が空にならない）', () => {

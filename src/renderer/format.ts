@@ -28,6 +28,12 @@ export function formatLocale(): string {
   return LOCALE;
 }
 
+/** 範囲（例: 7〜24%）。区切りは言語の登録表にある。spaced は前後に空白を置く（日時の範囲など、長い値のとき） */
+export function fmtRange(a: string, b: string, spaced = false): string {
+  const sep = languageOf(LANG).rangeSeparator;
+  return spaced ? `${a} ${sep} ${b}` : `${a}${sep}${b}`;
+}
+
 const tr = (key: string, vars?: Record<string, string | number>) => translate(LANG, key, vars);
 
 export function fmtTokens(n: number, compact = true): string {

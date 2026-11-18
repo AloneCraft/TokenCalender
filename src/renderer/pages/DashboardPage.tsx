@@ -6,7 +6,7 @@ import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
-import { fmtAgo, fmtDate, fmtDateTimeWd, fmtDuration, fmtInt, fmtPct, groupLabel, windowName } from '../format.ts';
+import { fmtAgo, fmtDate, fmtDateTimeWd, fmtDuration, fmtInt, fmtPct, fmtRange, groupLabel, windowName } from '../format.ts';
 import type { Band, PlanOverview, PlanWindow, ProviderPlan, SimulateResult } from '../../shared/api.ts';
 import type { Page } from '../App.tsx';
 
@@ -16,7 +16,7 @@ function bandText(b: Band | null | undefined, digits = 0, unit = ''): string {
   if (!b) return '—';
   const f = (v: number) => (digits === 0 ? fmtInt(v) : v.toFixed(digits));
   if (Math.abs(b.high - b.low) < Math.pow(10, -digits) * 0.5) return `${f(b.mid)}${unit}`;
-  return `${f(b.low)}〜${f(b.high)}${unit}`;
+  return `${fmtRange(f(b.low), f(b.high))}${unit}`;
 }
 
 export function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
@@ -345,7 +345,8 @@ function CycleChart({ win, t, zone, reservePct }: { win: PlanWindow; t: T; zone:
       data: [{ xAxis: now, label: { formatter: t('dash.chart.now'), position: 'end' }, lineStyle: { color: '#888' } }],
     };
     return {
-      grid: { left: 44, right: 44, top: 44, bottom: 30 },
+      // 右端に「上限」「目標」の名前を出す。言語によって長い（Objectif、Objetivo など）ため、余白を広めに取る
+      grid: { left: 44, right: 64, top: 44, bottom: 30 },
       legend: { top: 0, textStyle: { fontSize: 11 }, data: legendNames },
       tooltip: { trigger: 'axis', valueFormatter: (v: number) => (typeof v === 'number' ? `${v.toFixed(1)}%` : '') },
       xAxis: { type: 'time', min: start, max: reset, axisLabel: { formatter: (v: number) => fmtDate(v, zone) } },

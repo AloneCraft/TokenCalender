@@ -9,6 +9,14 @@
 import { ja, type MessageKey } from './messages/ja.ts';
 import { en } from './messages/en.ts';
 import { ko } from './messages/ko.ts';
+import { zhHans } from './messages/zh-Hans.ts';
+import { zhHant } from './messages/zh-Hant.ts';
+import { es } from './messages/es.ts';
+import { ptBR } from './messages/pt-BR.ts';
+import { fr } from './messages/fr.ts';
+import { de } from './messages/de.ts';
+import { ru } from './messages/ru.ts';
+import { uk } from './messages/uk.ts';
 
 export type { MessageKey };
 
@@ -20,11 +28,16 @@ export type PluralKey = `${MessageKey}.${PluralCategory}`;
 export type Messages = Record<MessageKey, string> & Partial<Record<PluralKey, string>>;
 
 /** 国旗の識別子（ISO 3166-1 の2文字・小文字）。絵は src/renderer/i18n/flags.tsx にある */
-export type FlagId = 'jp' | 'us' | 'kr';
+export type FlagId = 'jp' | 'us' | 'kr' | 'cn' | 'tw' | 'es' | 'br' | 'fr' | 'de' | 'ru' | 'ua';
 
 export interface LanguageDef {
   /** BCP 47 の言語タグ（例: ja, en, zh-Hans, pt-BR） */
   code: string;
+  /**
+   * この言語として扱う OS の言語タグ（小文字）。前方一致で見る（'zh-tw' は 'zh-TW'・'zh-TW-u-…' に一致）。
+   * コードそのものは書かなくてよい。例: zh-Hant は ['zh-tw', 'zh-hk', 'zh-mo']、pt-BR は ['pt']。
+   */
+  osTags?: readonly string[];
   /** その言語の文字で書いた言語名（選択欄に出す） */
   nativeName: string;
   /** 英語での言語名（補助の表示と並べ替えに使う） */
@@ -33,14 +46,27 @@ export interface LanguageDef {
   locale: string;
   /** 文字の向き。rtl の言語を足すときは画面の左右反転の対応も必要 */
   dir: 'ltr' | 'rtl';
+  /** 範囲の区切り（例: 7〜24%、7–24%）。言語ごとに慣用が違う */
+  rangeSeparator: string;
   flag: FlagId;
   messages: Messages;
 }
 
 export const LANGUAGES = [
-  { code: 'ja', nativeName: '日本語', englishName: 'Japanese', locale: 'ja-JP', dir: 'ltr', flag: 'jp', messages: ja },
-  { code: 'en', nativeName: 'English', englishName: 'English', locale: 'en-US', dir: 'ltr', flag: 'us', messages: en },
-  { code: 'ko', nativeName: '한국어', englishName: 'Korean', locale: 'ko-KR', dir: 'ltr', flag: 'kr', messages: ko },
+  { code: 'ja', nativeName: '日本語', englishName: 'Japanese', locale: 'ja-JP', dir: 'ltr', rangeSeparator: '〜', flag: 'jp', messages: ja },
+  { code: 'en', nativeName: 'English', englishName: 'English', locale: 'en-US', dir: 'ltr', rangeSeparator: '–', flag: 'us', messages: en },
+  { code: 'ko', nativeName: '한국어', englishName: 'Korean', locale: 'ko-KR', dir: 'ltr', rangeSeparator: '~', flag: 'kr', messages: ko },
+  // 中国語は、文字の種類（簡体字・繁体字）で辞書が違う。OS は zh-CN / zh-TW のような地域つきで返すため osTags で結ぶ。
+  // 種類の指定が無い zh は、簡体字にする。
+  { code: 'zh-Hans', osTags: ['zh-cn', 'zh-sg', 'zh'], nativeName: '简体中文', englishName: 'Chinese (Simplified)', locale: 'zh-CN', dir: 'ltr', rangeSeparator: '～', flag: 'cn', messages: zhHans },
+  { code: 'zh-Hant', osTags: ['zh-tw', 'zh-hk', 'zh-mo'], nativeName: '繁體中文', englishName: 'Chinese (Traditional)', locale: 'zh-TW', dir: 'ltr', rangeSeparator: '～', flag: 'tw', messages: zhHant },
+  { code: 'es', nativeName: 'Español', englishName: 'Spanish', locale: 'es-ES', dir: 'ltr', rangeSeparator: '–', flag: 'es', messages: es },
+  // ポルトガル語は、ブラジル版の辞書を、ポルトガル（pt-PT）など pt の全地域で使う
+  { code: 'pt-BR', osTags: ['pt'], nativeName: 'Português (Brasil)', englishName: 'Portuguese (Brazil)', locale: 'pt-BR', dir: 'ltr', rangeSeparator: '–', flag: 'br', messages: ptBR },
+  { code: 'fr', nativeName: 'Français', englishName: 'French', locale: 'fr-FR', dir: 'ltr', rangeSeparator: '–', flag: 'fr', messages: fr },
+  { code: 'de', nativeName: 'Deutsch', englishName: 'German', locale: 'de-DE', dir: 'ltr', rangeSeparator: '–', flag: 'de', messages: de },
+  { code: 'ru', nativeName: 'Русский', englishName: 'Russian', locale: 'ru-RU', dir: 'ltr', rangeSeparator: '–', flag: 'ru', messages: ru },
+  { code: 'uk', nativeName: 'Українська', englishName: 'Ukrainian', locale: 'uk-UA', dir: 'ltr', rangeSeparator: '–', flag: 'ua', messages: uk },
 ] as const satisfies readonly LanguageDef[];
 
 export type LangCode = (typeof LANGUAGES)[number]['code'];
@@ -63,18 +89,26 @@ export function isLangCode(v: unknown): v is LangCode {
   return typeof v === 'string' && BY_CODE.has(v.toLowerCase());
 }
 
+/** 言語ごとの、OS の言語タグに当てる候補（コードと osTags。小文字）。*/
+const MATCH_KEYS: { key: string; lang: LangCode }[] = LANGUAGES.flatMap((l) => {
+  const d = l as LanguageDef;
+  return [d.code, ...(d.osTags ?? [])].map((k) => ({ key: k.toLowerCase(), lang: l.code as LangCode }));
+});
+
 /**
  * OS の言語の並び（優先順）から、登録されている言語を選ぶ。
- * 地域つきのタグがそのまま一致すればそれを、無ければ言語の部分（ja-JP → ja）で探す。
- * どれも無ければ FALLBACK_LANG。
+ * 各タグは、言語のコード・osTags と前方一致で比べ（zh-TW は zh-tw に、ja-JP は ja に一致）、
+ * 複数に当たったら長い方（より具体的な方）を採る。例: zh-Hant-TW は zh-tw でなく zh を選ばない。
+ * どれにも当たらなければ次のタグへ進み、最後まで無ければ FALLBACK_LANG。
  */
 export function matchOsLanguage(osLanguages: readonly string[]): LangCode {
   for (const raw of osLanguages) {
     const tag = raw.replace('_', '-').toLowerCase();
-    const exact = BY_CODE.get(tag);
-    if (exact) return exact.code as LangCode;
-    const base = BY_CODE.get(tag.split('-')[0]!);
-    if (base) return base.code as LangCode;
+    let best: { len: number; lang: LangCode } | null = null;
+    for (const m of MATCH_KEYS) {
+      if ((tag === m.key || tag.startsWith(m.key + '-')) && (!best || m.key.length > best.len)) best = { len: m.key.length, lang: m.lang };
+    }
+    if (best) return best.lang;
   }
   return FALLBACK_LANG;
 }

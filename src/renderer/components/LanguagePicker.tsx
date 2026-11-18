@@ -49,6 +49,11 @@ export function LanguagePicker({
     // 開いたときだけ選択中の位置に合わせる（selectedIndex が変わるのは選んだ後で、そのときは閉じている）
   }, [open]);
 
+  // 一覧が長くなったとき、キーボードで動かした項目が見える位置まで一覧を動かす
+  useEffect(() => {
+    if (open) document.getElementById(`${baseId}-opt-${active}`)?.scrollIntoView({ block: 'nearest' });
+  }, [open, active, baseId]);
+
   const choose = (i: number) => {
     const o = options[i];
     if (!o) return;
@@ -113,7 +118,7 @@ export function LanguagePicker({
       >
         <Flag id={currentDef.flag} size={compact ? 14 : 16} />
         {compact ? (
-          <span className="lang-code">{currentDef.code.toUpperCase()}</span>
+          <span className="lang-code" title="狭い案内帯に収まるよう言語の部分だけ（zh-Hans → ZH）。区別は国旗が担う">{currentDef.code.split('-')[0]!.toUpperCase()}</span>
         ) : (
           <span className="lang-current">{current.value === 'system' ? t('lang.systemCurrent', { name: currentDef.nativeName }) : <span lang={currentDef.code}>{currentDef.nativeName}</span>}</span>
         )}

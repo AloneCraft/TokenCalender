@@ -2,6 +2,7 @@
 // ホストのマウス・キーボードは使わない（Electron の操作は CDP 経由）。
 
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
+import { LANGUAGES } from '../../src/shared/i18n/languages.ts';
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -202,10 +203,12 @@ test.describe('Token Calendar', () => {
     await expect(button).toContainText('OS に合わせる（今は 日本語）');
     await button.click();
     const list = page.getByRole('listbox');
-    // OS に合わせる ＋ 登録されている言語（日本語・English・한국어）
-    await expect(list.getByRole('option')).toHaveCount(4);
-    await expect(list.locator('[data-value="ko"] [lang="ko"]')).toHaveText('한국어');
-    await expect(list.locator('[data-value="ko"] svg.flag')).toHaveCount(1);
+    // OS に合わせる ＋ 登録されているすべての言語。どの言語にも国旗と、その言語の文字の言語名がある
+    await expect(list.getByRole('option')).toHaveCount(1 + LANGUAGES.length);
+    for (const l of LANGUAGES) {
+      await expect(list.locator(`[data-value="${l.code}"] [lang="${l.code}"]`), l.code).toHaveText(l.nativeName);
+      await expect(list.locator(`[data-value="${l.code}"] svg.flag`), l.code).toHaveCount(1);
+    }
     await expect(list.locator('[data-value="ja"] [lang="ja"]')).toHaveText('日本語');
     await expect(list.locator('[data-value="en"] [lang="en"]').first()).toHaveText('English');
     await expect(list.locator('[data-value="ja"] svg.flag')).toHaveCount(1);
@@ -236,6 +239,35 @@ test.describe('Token Calendar', () => {
     expect(text).not.toMatch(/[ぁ-んァ-ヶ]/);
     await expect(page.locator('html')).toHaveAttribute('lang', 'ko-KR');
   });
+
+  // 新しく足した言語: OS の言語から選ばれ、画面に日本語の文が混ざらず、その言語の文字・国旗で出ること
+  const OS_CASES: { os: string; title: string; nav: string; html: string }[] = [
+    { os: 'zh-CN', title: '额度仪表盘', nav: '日历', html: 'zh-CN' },
+    { os: 'zh-TW', title: '額度儀表板', nav: '日曆', html: 'zh-TW' },
+    { os: 'es-MX', title: 'Panel de límites de uso', nav: 'Calendario', html: 'es-ES' },
+    { os: 'pt-PT', title: 'Painel de limites de uso', nav: 'Calendário', html: 'pt-BR' },
+    { os: 'fr-CA', title: 'Tableau de bord des limites', nav: 'Calendrier', html: 'fr-FR' },
+    { os: 'de-AT', title: 'Limit-Übersicht', nav: 'Kalender', html: 'de-DE' },
+    { os: 'ru-RU', title: 'Панель лимитов использования', nav: 'Календарь', html: 'ru-RU' },
+    { os: 'uk-UA', title: 'Панель лімітів використання', nav: 'Календар', html: 'uk-UA' },
+  ];
+  for (const c of OS_CASES) {
+    test(`OS の言語が ${c.os} なら、その言語で表示する`, async () => {
+      env = makeEnv(true);
+      ({ app, page } = await launch(env, c.os));
+      await expect(page.locator('h1')).toContainText(c.title, { timeout: 20000 });
+      await expect(page.locator('nav')).toContainText(c.nav);
+      await expect(page.locator('html')).toHaveAttribute('lang', c.html);
+      // 日本語の文が混ざっていない（中国語の漢字はひらがな・カタカナを含まない）
+      const text = await page.locator('.page').innerText();
+      expect(text).not.toMatch(/[ぁ-んァ-ヶ]/);
+      // 範囲の区切りも、日本語の「〜」（波ダッシュ）が混ざらず、その言語の慣用で出る
+      expect(text).not.toContain('〜');
+      // 案内帯の名前が途中で折れて、はみ出していない
+      const overflow = await page.locator('.nav button').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+      expect(overflow).toEqual([]);
+    });
+  }
 
   test('OS の言語が英語なら英語で表示する', async () => {
     env = makeEnv(true);

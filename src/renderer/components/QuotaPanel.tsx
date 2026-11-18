@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
-import { fmtAgo, fmtDateTime, fmtDuration, fmtMoney, fmtPct, fmtTokens, roundSig, windowName } from '../format.ts';
+import { fmtAgo, fmtDateTime, fmtDuration, fmtMoney, fmtPct, fmtRange, fmtTokens, roundSig, windowName } from '../format.ts';
 import type { EstimateView } from '../../shared/api.ts';
 
 export function QuotaPanel({ onOpenEstimate }: { onOpenEstimate: () => void }) {
@@ -85,12 +85,12 @@ export function QuotaPanel({ onOpenEstimate }: { onOpenEstimate: () => void }) {
               <>
                 {capC && (
                   <div className="big">
-                    {fmtMoney(roundSig(capC.low, 2), money)}〜{fmtMoney(roundSig(capC.high, 2), money)} <span className="faint">{t('common.equiv')}</span>
+                    {fmtRange(fmtMoney(roundSig(capC.low, 2), money), fmtMoney(roundSig(capC.high, 2), money))}<span className="faint">{t('common.equiv')}</span>
                   </div>
                 )}
                 {capT && (
                   <div className="faint">
-                    {fmtTokens(roundSig(capT.low))}〜{fmtTokens(roundSig(capT.high))} tok
+                    {fmtRange(fmtTokens(roundSig(capT.low)), fmtTokens(roundSig(capT.high)))} tok
                   </div>
                 )}
                 {!est.capacityCostNano && !est.capacityTokens && <div className="faint">{t('est.reference')}</div>}

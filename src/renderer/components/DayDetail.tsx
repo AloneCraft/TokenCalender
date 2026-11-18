@@ -3,7 +3,7 @@ import { api } from '../api.ts';
 import { commonFilter, useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { EChart, type EChartsOption } from './EChart.tsx';
-import { colorFor, fmtDateTime, fmtMoney, fmtTime, fmtTokens } from '../format.ts';
+import { colorFor, fmtDateTime, fmtMoney, fmtRange, fmtTime, fmtTokens } from '../format.ts';
 import type { DayDetailResponse } from '../../shared/api.ts';
 
 export function DayDetail({ date, onClose }: { date: string; onClose: () => void }) {
@@ -87,7 +87,7 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
                   {d.cycles.map((c) => (
                     <tr key={c.startMs}>
                       <td>
-                        {fmtDateTime(c.startMs, zone)} 〜 {fmtDateTime(c.endMs, zone)} {c.estimated && <span className="badge est">{t('reason.estimated_cycle')}</span>}
+                        {fmtRange(fmtDateTime(c.startMs, zone), fmtDateTime(c.endMs, zone), true)} {c.estimated && <span className="badge est">{t('reason.estimated_cycle')}</span>}
                       </td>
                       <td className="r">{fmtTokens(c.tokensInDay, false)}</td>
                       <td className="r">{fmtMoney(c.usageInDay, money)}</td>
@@ -127,7 +127,7 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
               {d.turns.slice(0, 100).map((x) => (
                 <tr key={`${x.provider}:${x.sessionId}:${x.turnId}`}>
                   <td>
-                    {fmtTime(x.startedAtMs ?? x.lastAtMs, zone)}〜{fmtTime(x.lastAtMs, zone)}
+                    {fmtRange(fmtTime(x.startedAtMs ?? x.lastAtMs, zone), fmtTime(x.lastAtMs, zone))}
                   </td>
                   <td>
                     {x.provider === 'claude' ? 'Claude' : 'Codex'} {x.projectLabel ?? '—'}
