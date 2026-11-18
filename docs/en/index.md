@@ -1,5 +1,6 @@
 ---
 title: Token Calendar User Guide
+description: A desktop app to manage your Claude Code and Codex subscription limits with remaining amount, forecasts, daily budgets and per-model consumption rates
 lang: en
 ---
 
