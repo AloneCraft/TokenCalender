@@ -10,6 +10,7 @@ import { RecentPanel } from '../components/RecentPanel.tsx';
 import { QuotaPanel } from '../components/QuotaPanel.tsx';
 import { DayDetail } from '../components/DayDetail.tsx';
 import { TimelineChart } from '../components/TimelineChart.tsx';
+import { Loading } from '../components/Loading.tsx';
 
 interface View {
   measure: CalendarRequest['measure'];
@@ -104,11 +105,7 @@ export function CalendarPage({ onOpenEstimate }: { onOpenEstimate: () => void })
     <div className="layout">
       <div className="stack">
         {error && <div className="note warn">{error}</div>}
-        {loading && (
-          <div className="faint" role="status" aria-live="polite">
-            {t('common.loading')}
-          </div>
-        )}
+        {loading && <Loading />}
         {filters.unit === 'day' && data && (
           <div className="card">
             <BarDefs />

@@ -27,6 +27,10 @@ async function mainT(): Promise<(key: string, vars?: Record<string, string | num
 }
 
 app.setName(APP_NAME);
+// 開発・試験では TOKEN_CALENDAR_DATA_DIR でデータの置き場所を変えられる。
+// 単一起動の鍵は Electron の保存場所ごとに作られるため、保存場所も同じ場所へ移す。
+// 移さないと、普段使いのアプリが起動中のときに試験用のアプリが「すでに起動中」と判断して終了してしまう。
+if (process.env.TOKEN_CALENDAR_DATA_DIR) app.setPath('userData', process.env.TOKEN_CALENDAR_DATA_DIR);
 if (!app.requestSingleInstanceLock()) app.quit();
 
 const dataDir = process.env.TOKEN_CALENDAR_DATA_DIR ?? app.getPath('userData');

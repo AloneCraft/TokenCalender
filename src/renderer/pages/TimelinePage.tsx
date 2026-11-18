@@ -3,6 +3,7 @@ import { api } from '../api.ts';
 import { commonFilter, useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { Seg } from '../components/Seg.tsx';
+import { Loading } from '../components/Loading.tsx';
 import { TimelineChart } from '../components/TimelineChart.tsx';
 import { fmtMeasure, fmtTokens, windowKeyLabel } from '../format.ts';
 import type { Measure, TimelineGranularity, TimelineResponse } from '../../shared/api.ts';
@@ -23,6 +24,7 @@ export function TimelinePage() {
   // 結果を求めたときの測る値で描画する（切り替え直後に古い結果を新しい書式で見せない）
   const [data, setData] = useState<(TimelineResponse & { measure: Measure }) | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const provider = filters.provider;
   const w5h = provider !== 'both' ? (quota?.windows.find((w) => w.provider === provider && w.windowMinutes === 300)?.key ?? null) : null;
@@ -33,6 +35,7 @@ export function TimelinePage() {
     const granularity: TimelineGranularity =
       kind === 'days' ? { kind: 'days', n, m } : kind === 'five_hour' ? { kind: 'five_hour', m: m5 } : { kind: 'calendar_week', weeks };
     setError(null);
+    setLoading(true);
     api()
       .timeline({
         ...commonFilter(app),
@@ -44,7 +47,8 @@ export function TimelinePage() {
         weekStart: settings.weekStart,
       })
       .then((d) => alive && setData({ ...d, measure: filters.measure }))
-      .catch((e) => alive && setError(String(e)));
+      .catch((e) => alive && setError(String(e)))
+      .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
@@ -101,8 +105,9 @@ export function TimelinePage() {
         {kind === 'calendar_week' && <div className="faint" style={{ marginTop: 6 }}>{t('tl.weekNote')}</div>}
       </div>
       {error && <div className="note warn">{error}</div>}
+      {loading && <Loading block={!data} />}
       {data && (
-        <div className="card">
+        <div className={loading ? 'card is-stale' : 'card'}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2>
               {kind === 'five_hour' ? (data.fiveHourBasis === 'official' ? t('tl.official5h') : t('tl.analytic5h')) : (data.windowLabel ? (windowKeyLabel(wWeek) ?? data.windowLabel) : t('tl.bars'))}

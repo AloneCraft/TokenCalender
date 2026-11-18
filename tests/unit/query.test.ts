@@ -149,3 +149,56 @@ describe('直近の利用', () => {
     expect(r.items[0]!.turn.priced).toBe(false); // 未知モデルを含む
   });
 });
+
+describe('分析の図は、SQL でまとめて読む経路と、1件ずつ読む経路で同じ結果になる', () => {
+  const sources = [
+    ev('a', '2026-11-02T10:00', 10, { model: 'm1', effort: 'high', projectLabel: 'pa' }),
+    ev('b', '2026-11-02T10:03', 20, { model: 'm2', effort: 'low', projectLabel: 'pb', provider: 'claude' }),
+    ev('c', '2026-11-03T23:59', 15, { model: 'm1', isSidechain: true }),
+    ev('d', '2026-11-04T00:00', 12, { model: 'm1', billingMode: 'api' }),
+    ev('e', '2026-11-05T08:05', 5, { model: 'mystery-model', billingMode: 'unknown' }),
+    ev('f', '2026-11-05T08:07', 7, { model: 'm2', provider: 'claude', accountKey: 'acc' }),
+    ev('g', '2026-11-08T12:00', 3, { model: 'm1' }),
+  ];
+  const from = DateTime.fromISO('2026-11-01', { zone: Z }).toMillis();
+  const to = DateTime.fromISO('2026-11-10', { zone: Z }).toMillis();
+
+  it('すべての図・測る値・切り口で一致する（期間の端を 1ms ずらすと従来の経路になる）', () => {
+    const db = memoryDb();
+    new WriteRepo(db).upsertEvents(sources, 1);
+    const svc = new QueryService(db, { now: () => NOW });
+    const base = { ...filter, provider: 'both' as const };
+    let compared = 0;
+    for (const chartId of ['bars', 'share', 'cache_ratio', 'weekday_hour', 'ranking'] as const) {
+      for (const measure of ['tokens', 'cost', 'events', 'output'] as const) {
+        for (const dimension of ['none', 'model', 'provider', 'project', 'effort', 'billing', 'account', 'sidechain', 'token_type'] as const) {
+          for (const stepMinutes of [15, 60, 1440, 10080]) {
+            const req = { ...base, chartId, measure, dimension, stepMinutes, fromMs: from, toMs: to };
+            const fast = svc.analysis(req);
+            const slow = svc.analysis({ ...req, fromMs: from + 1, toMs: to + 1 });
+            const nz = (s: typeof fast) => s.buckets.filter((b) => b.total !== 0 && !Number.isNaN(b.total)).map((b) => [b.startMs, b.total, b.byDim]);
+            expect(nz(fast), `${chartId}/${measure}/${dimension}/${stepMinutes}`).toEqual(nz(slow));
+            expect(fast.dimensionKeys.slice().sort()).toEqual(slow.dimensionKeys.slice().sort());
+            expect(fast.periodTotal).toBe(slow.periodTotal);
+            expect(fast.unpricedTokens).toBe(slow.unpricedTokens);
+            expect(fast.matrix).toEqual(slow.matrix);
+            compared++;
+          }
+        }
+      }
+    }
+    expect(compared).toBe(5 * 4 * 9 * 4);
+  });
+
+  it('絞り込み（モデル・サブエージェント除外）でも一致する', () => {
+    const db = memoryDb();
+    new WriteRepo(db).upsertEvents(sources, 1);
+    const svc = new QueryService(db, { now: () => NOW });
+    const req = { ...filter, provider: 'both' as const, models: ['m1'], includeSidechain: false, chartId: 'share' as const, measure: 'tokens' as const, dimension: 'model' as const, stepMinutes: 1440, fromMs: from, toMs: to };
+    const fast = svc.analysis(req);
+    const slow = svc.analysis({ ...req, fromMs: from + 1, toMs: to + 1 });
+    expect(fast.periodTotal).toBe(12 + 10 + 3);
+    expect(fast.periodTotal).toBe(slow.periodTotal);
+    expect(fast.buckets.filter((b) => b.total).map((b) => [b.startMs, b.total])).toEqual(slow.buckets.filter((b) => b.total).map((b) => [b.startMs, b.total]));
+  });
+});

@@ -3,7 +3,7 @@
 
 import { DateTime } from 'luxon';
 import type { Db } from '../db/database.ts';
-import { getSetting, listWindows, loadEvents, loadLatest, loadQuota, type EventFilter, type EventRow, type QuotaRow } from '../db/readRepo.ts';
+import { AGG_BUCKET_MS, getSetting, loadEventAggregates, listWindows, loadEvents, loadLatest, loadQuota, type EventFilter, type EventRow, type QuotaRow } from '../db/readRepo.ts';
 import { PricingEngine, type PricingMode } from '../core/pricing/engine.ts';
 import type { PriceEntry } from '../core/pricing/table.ts';
 import { aggregateBuckets, cumulativeWithinCycles, PrefixSum, usageByCycle, type Dimension, type Measure } from '../core/aggregate/series.ts';
@@ -790,8 +790,24 @@ export class QueryService {
 
   // ---------- 分析 ----------
 
+  /**
+   * 分析の図用にイベントを読む。通常は SQL 側で 5分 × 属性ごとにまとめて読む（数十万件でも速い）。
+   * 次の場合は、1件ずつ読む従来の経路にする: セッション単位の図、期間の端が 5分の区切りに合わない、
+   * 取り込み時に金額を計算していない行がある、「現在の単価で再評価」で金額を計算し直す。
+   */
+  private loadForAnalysis(req: AnalysisRequest): EventRow[] {
+    const filter = this.eventFilter(req, req.fromMs, req.toMs);
+    const aligned = req.fromMs % AGG_BUCKET_MS === 0 && req.toMs % AGG_BUCKET_MS === 0;
+    const recompute = req.pricingMode === 'current' && this.pricing().hasDatedEntries();
+    if (req.chartId !== 'session_size' && aligned && !recompute) {
+      const agg = loadEventAggregates(this.db, filter);
+      if (!agg.hasUncosted) return agg.rows;
+    }
+    return this.loadPriced(filter, req.pricingMode);
+  }
+
   analysis(req: AnalysisRequest): AnalysisSeries {
-    const rows = this.loadPriced(this.eventFilter(req, req.fromMs, req.toMs), req.pricingMode);
+    const rows = this.loadForAnalysis(req);
     const unpricedTokens = rows.filter((r) => !r.priced).reduce((s, r) => s + r.total, 0);
     const prefix = new PrefixSum(rows, req.measure);
     const periodTotal = prefix.sum(req.fromMs, req.toMs);

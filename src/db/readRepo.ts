@@ -49,6 +49,8 @@ export interface EventRow {
   costNano: number;
   priced: boolean;
   costKnown: boolean;
+  /** 集計済みの行（loadEventAggregates）でだけ付く、まとめたイベント数。無ければ 1 件 */
+  count?: number;
 }
 
 function inList(col: string, values: string[] | undefined, params: (string | number | null)[]): string {
@@ -62,6 +64,72 @@ function inList(col: string, values: string[] | undefined, params: (string | num
   }
   if (hasUnknown) parts.push(`${col} IS NULL`);
   return ` AND (${parts.join(' OR ')})`;
+}
+
+/** 集計用の最小の区間（分）。これより細かい刻みの図は無く、暦の区切りも必ずこの倍数に当たる。 */
+export const AGG_BUCKET_MS = 5 * 60000;
+
+/**
+ * 分析の図のために、イベントを 5分 × 属性の組ごとにまとめて読む（SQL 側で合計する）。
+ * 数十万件を1件ずつ JS の部品にするより、桁違いに速い。
+ * 返す行は ts が 5分区間の始まり、count がその組のイベント数。
+ * 取り込み時に金額を計算していない行（costKnown が false）があるかは hasUncosted で返す。
+ */
+export function loadEventAggregates(db: Db, f: EventFilter): { rows: EventRow[]; hasUncosted: boolean } {
+  const params: (string | number | null)[] = [f.fromMs, f.toMs];
+  let where = 'ts >= ? AND ts < ?';
+  where += inList('provider', f.providers, params);
+  where += inList('account_key', f.accountKeys, params);
+  where += inList('model', f.models, params);
+  where += inList('project_key', f.projectKeys, params);
+  where += inList('billing_mode', f.billingModes, params);
+  if (f.includeSidechain === false) where += ' AND is_sidechain = 0';
+  const sql = `SELECT (ts / ${AGG_BUCKET_MS}) * ${AGG_BUCKET_MS} AS bts, provider, account_key, is_sidechain, model, effort, project_label, billing_mode,
+      priced, cost_nano IS NULL AS uncosted, count(*) AS n,
+      sum(input_uncached) AS input_uncached, sum(cache_read) AS cache_read, sum(cache_write) AS cache_write, sum(output) AS output,
+      sum(reasoning) AS reasoning, sum(total) AS total, sum(cost_nano) AS cost_nano
+    FROM usage_events WHERE ${where}
+    GROUP BY bts, provider, account_key, is_sidechain, model, effort, project_label, billing_mode, priced, uncosted
+    ORDER BY bts`;
+  const raw = db.prepare(sql).all(...params) as Record<string, unknown>[];
+  let hasUncosted = false;
+  const rows = raw.map((r): EventRow => {
+    const uncosted = r.uncosted === 1;
+    if (uncosted) hasUncosted = true;
+    return {
+      eventKey: '',
+      ts: Number(r.bts),
+      provider: r.provider as Provider,
+      accountKey: (r.account_key as string | null) ?? null,
+      sessionId: '',
+      turnId: null,
+      agentId: null,
+      isSidechain: r.is_sidechain === 1,
+      model: (r.model as string | null) ?? null,
+      effort: (r.effort as string | null) ?? null,
+      speed: null,
+      inferenceGeo: null,
+      projectKey: null,
+      projectLabel: (r.project_label as string | null) ?? null,
+      billingMode: r.billing_mode as BillingMode,
+      inputUncached: Number(r.input_uncached),
+      cacheRead: Number(r.cache_read),
+      cacheWrite: Number(r.cache_write),
+      cacheWrite5m: null,
+      cacheWrite1h: null,
+      output: Number(r.output),
+      reasoning: r.reasoning == null ? null : Number(r.reasoning),
+      unclassified: 0,
+      total: Number(r.total),
+      finality: 1,
+      flags: [],
+      costNano: r.cost_nano == null ? 0 : Number(r.cost_nano),
+      priced: r.priced === 1,
+      costKnown: !uncosted,
+      count: Number(r.n),
+    };
+  });
+  return { rows, hasUncosted };
 }
 
 export function loadEvents(db: Db, f: EventFilter): EventRow[] {

@@ -5,6 +5,7 @@ import { commonFilter, useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { CHARTS, type ChartDef } from '../charts/registry.ts';
 import { EChart } from '../components/EChart.tsx';
+import { Loading } from '../components/Loading.tsx';
 import { fmtMeasure, fmtTokens } from '../format.ts';
 import type { AnalysisSeries, Measure } from '../../shared/api.ts';
 
@@ -20,6 +21,7 @@ export function AnalysisPage() {
   const [step, setStep] = useState(def.defaultStepMinutes);
   const [data, setData] = useState<(AnalysisSeries & { measure: Measure }) | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => setStep(def.defaultStepMinutes), [def]);
 
@@ -28,10 +30,12 @@ export function AnalysisPage() {
     const fromMs = DateTime.fromISO(from, { zone }).startOf('day').toMillis();
     const toMs = DateTime.fromISO(to, { zone }).plus({ days: 1 }).startOf('day').toMillis();
     setError(null);
+    setLoading(true);
     api()
       .analysis({ ...commonFilter(app), chartId, fromMs, toMs, stepMinutes: step, measure: filters.measure, dimension: def.usesDimension ? filters.dimension : 'none' })
       .then((d) => alive && setData({ ...d, measure: filters.measure }))
-      .catch((e) => alive && setError(String(e)));
+      .catch((e) => alive && setError(String(e)))
+      .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
@@ -92,8 +96,9 @@ export function AnalysisPage() {
         </div>
       </div>
       {error && <div className="note warn">{error}</div>}
+      {loading && <Loading block={!data} />}
       {data && option && (
-        <div className="card">
+        <div className={loading ? 'card is-stale' : 'card'}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2>{t(def.titleKey)}</h2>
             <span className="faint">

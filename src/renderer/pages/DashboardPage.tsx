@@ -6,6 +6,7 @@ import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
+import { Loading } from '../components/Loading.tsx';
 import { fmtAgo, fmtDate, fmtDateTimeWd, fmtDuration, fmtInt, fmtPct, fmtRange, groupLabel, windowName } from '../format.ts';
 import type { Band, PlanOverview, PlanWindow, ProviderPlan, SimulateResult } from '../../shared/api.ts';
 import type { Page } from '../App.tsx';
@@ -37,7 +38,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void })
   }, [app.slowVersion, app.zone, app.settings.reservePct, app.settings.budgetWeekdayWeights, app.settings.demo]);
 
   if (error) return <div className="note warn">{t('common.error')}: {error}</div>;
-  if (!data) return <div className="empty">{t('common.loading')}</div>;
+  if (!data) return <Loading block />;
 
   const bindingWin = data.binding ? data.windows.find((w) => w.key === data.binding!.key) : null;
   return (

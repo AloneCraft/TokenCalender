@@ -6,6 +6,7 @@ import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { Seg } from '../components/Seg.tsx';
+import { Loading } from '../components/Loading.tsx';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
 import { fmtDate, fmtInt, fmtTokens, groupLabel, windowName } from '../format.ts';
 import type { Band, RatesView } from '../../shared/api.ts';
@@ -126,7 +127,7 @@ export function RatesPage() {
             </label>
           </>
         )}
-        {loading && <span className="faint">{t('common.loading')}</span>}
+        {loading && <Loading />}
       </div>
       {!range && <div className="note warn">{t('rates.badRange')}</div>}
       {error && <div className="note warn">{error}</div>}
@@ -136,8 +137,35 @@ export function RatesPage() {
             {data.windowMinutes ? t('rates.basis', { window: windowName(data.windowMinutes), from: fmtDate(data.fromMs, app.zone), to: fmtDate(data.toMs - 1, app.zone) }) : ''}{' '}
             {data.intervals > 0 && t('rates.intervals', { n: data.intervals, dom: data.dominatedIntervals, mixed: data.mixedIntervals, unobs: data.unobservedIntervals })}
           </div>
-          {data.unavailable && <div className="note warn">{t(`rates.unavailable.${data.unavailable}`)}</div>}
-          {data.intervals > 0 && data.unobservedIntervals / data.intervals > 0.1 && <div className="note warn">{t('rates.unobservedWarn')}</div>}
+          {data.usageMix.length > 0 && (
+            <section className="card stack">
+              <h2>{t('rates.mix.title')}</h2>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>{t('rates.col.group')}</th>
+                    <th className="r">{t('rates.mix.tokens')}</th>
+                    <th className="r">{t('rates.mix.turns')}</th>
+                    <th style={{ width: '35%' }}>{t('rates.mix.share')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.usageMix.slice(0, 15).map((m) => (
+                    <tr key={m.group}>
+                      <td>{groupLabel(m.group)}</td>
+                      <td className="r num">{fmtTokens(m.tokens)}</td>
+                      <td className="r num">{fmtInt(m.turns)}</td>
+                      <td>
+                        <div className="bar-track" title={`${(m.share * 100).toFixed(1)}%`}>
+                          <div className="bar-fill" style={{ width: `${m.share * 100}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
           {data.groups.length > 0 && (
             <section className="card stack">
               <h2>{t('rates.table.title')}</h2>
@@ -211,35 +239,8 @@ export function RatesPage() {
               </div>
             </section>
           )}
-          {data.usageMix.length > 0 && (
-            <section className="card stack">
-              <h2>{t('rates.mix.title')}</h2>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>{t('rates.col.group')}</th>
-                    <th className="r">{t('rates.mix.tokens')}</th>
-                    <th className="r">{t('rates.mix.turns')}</th>
-                    <th style={{ width: '35%' }}>{t('rates.mix.share')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.usageMix.slice(0, 15).map((m) => (
-                    <tr key={m.group}>
-                      <td>{groupLabel(m.group)}</td>
-                      <td className="r num">{fmtTokens(m.tokens)}</td>
-                      <td className="r num">{fmtInt(m.turns)}</td>
-                      <td>
-                        <div className="bar-track" title={`${(m.share * 100).toFixed(1)}%`}>
-                          <div className="bar-fill" style={{ width: `${m.share * 100}%` }} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          )}
+          {data.unavailable && <div className="note warn">{t(`rates.unavailable.${data.unavailable}`)}</div>}
+          {data.intervals > 0 && data.unobservedIntervals / data.intervals > 0.1 && <div className="note warn">{t('rates.unobservedWarn')}</div>}
         </>
       )}
     </div>

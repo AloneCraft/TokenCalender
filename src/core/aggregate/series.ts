@@ -32,7 +32,7 @@ export function valueOf(r: EventRow, m: Measure): number {
     case 'reasoning':
       return r.reasoning ?? 0;
     case 'events':
-      return 1;
+      return r.count ?? 1;
   }
 }
 
@@ -94,14 +94,15 @@ export function aggregateBuckets(rows: EventRow[], buckets: Bucket[], measure: M
     const i = bucketIndexOf(buckets, r.ts);
     if (i < 0) continue;
     const a = out[i]!;
-    a.events++;
+    const n = r.count ?? 1;
+    a.events += n;
     a.tokens += r.total;
     if (!r.priced) {
-      a.unpricedEvents++;
+      a.unpricedEvents += n;
       a.unpricedTokens += r.total;
     }
-    if (r.flags.length > 0) a.flaggedEvents++;
-    if (r.finality === 0) a.partialEvents++;
+    if (r.flags.length > 0) a.flaggedEvents += n;
+    if (r.finality === 0) a.partialEvents += n;
     if (dim === 'token_type' && measure !== 'cost' && measure !== 'events') {
       const parts: [string, number][] = [
         ['input', r.inputUncached],
