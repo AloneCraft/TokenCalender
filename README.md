@@ -1,5 +1,7 @@
 # Token Calendar
 
+**📖 説明書: https://alonecraft.github.io/TokenCalender/** ・ **User guide (English): https://alonecraft.github.io/TokenCalender/en/**
+
 Claude Code と OpenAI Codex の使用量をローカルのログから集計し、カレンダーとチャートで表示するデスクトップアプリ。
 公式の利用枠の利用率と照合して、週制限の「実効容量」（自分の使い方で週枠が何トークン・何ドル相当に当たるか）を推定する。
 
@@ -16,6 +18,9 @@ Claude Code と OpenAI Codex の使用量をローカルのログから集計し
 
 ## 主な機能
 
+- 利用枠ダッシュボード（最初の画面）: 公式の残り、リセットまでの時間、今日あと使える量（1日ごとの予算）、リセット時に残る見込みと持つ確率、今のモデル・エフォートであと何回依頼できるか、次に作業を止める可能性がある枠、根拠つきの提案、使い方を変えた場合のシミュレーター
+- モデル別消費: 期間を選んで、モデル×エフォートごとに公式の利用枠をどれだけ減らすか（1回あたり・100万トークンあたり・1セッションあたり、幅つき）を推定する。API 料金は使わない
+- 表示言語は OS の言語設定に合わせる（日本語なら日本語、それ以外は英語）。設定で固定もできる
 - 月間カレンダー（日付ごとに縦棒1本）。日別使用量／リセット周期内累積（薄色＝前日までの累計、濃色＝当日分）
 - 時系列ページ: N日単位で過去M日、5時間単位で過去M枠、暦週。上段は区間ごと、下段はリセットで 0 に戻る累積
 - 直近の利用: 今回のターン・セッション累計・内訳・状態（実行中／部分取得／記録済み／更新待ち）
@@ -65,13 +70,14 @@ TOKEN_CALENDAR_DATA_DIR=D:/CodexTemp/TokenCalendar/dev-data npm run dev
 
 | 段階 | コマンド | 合格条件 |
 | --- | --- | --- |
-| 型 | `npm run typecheck` | エラーなし |
+| 型（英語の訳し漏れも検出） | `npm run typecheck` | エラーなし |
 | 静的検査 | `npm run lint` | エラーなし |
 | 単体（必須試験 A〜R の大半） | `npm run test` | 全件合格 |
 | 画面の通し（N・O・R など） | `npm run e2e` | 全件合格。試験用のログだけを読む（`TOKEN_CALENDAR_HOME`） |
 | 実ログの取り込み | `node scripts/ingest-cli.ts <DBのパス> --again` | エラー 0、2回目の走査で件数が増えない |
 | Codex 合計の独立検証 | `node scripts/verify-codex-totals.ts <DBのパス> 1500` | 種類ごとの差が verification.md の記録から悪化しない |
 | 画面の問い合わせ時間 | `node scripts/bench-queries.ts <DBのパス>` | カレンダーが 1 秒未満 |
+| 取り込みの新旧経路の一致 | `npx vitest run tests/unit/byteFeed.test.ts` | 合格（バイトのまま振り分ける経路と文字列の経路が同じ結果） |
 | カレンダー・時系列・元イベントの一致 | `node scripts/check-consistency.ts <DBのパス>` | 3つが一致 |
 | 配布物の起動とメモリ | `node scripts/check-packaged.ts <exe> <データ> [ログのホーム]` | 画面が出る（Playwright 経由では遅く出る点に注意） |
 
