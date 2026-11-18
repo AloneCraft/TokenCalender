@@ -10,6 +10,17 @@ const CHUNK = 1 << 20; // 1MB
 const NL = 0x0a;
 
 export type LineHandler = (line: string, offset: number) => void | Promise<void>;
+/** 行をバイトのまま受け取る。不要な行を文字に変換せずに捨てられる（取り込みの高速化のため）。末尾の CR は除いて渡す。 */
+export type LineBufferHandler = (line: Buffer, offset: number) => void | Promise<void>;
+
+function stripCr(buf: Buffer): Buffer {
+  const end = buf.length;
+  return end > 0 && buf[end - 1] === 0x0d ? buf.subarray(0, end - 1) : buf;
+}
+
+function isPromise(v: unknown): v is Promise<void> {
+  return v != null && typeof (v as Promise<void>).then === 'function';
+}
 
 export interface ReadResult {
   /** 次回読み始める位置（最後に処理した改行の直後） */
@@ -17,20 +28,33 @@ export interface ReadResult {
   lines: number;
 }
 
+/** CR は読み取り側（stripCr）で除いてある */
 function decodeLine(buf: Buffer): string {
-  let end = buf.length;
-  if (end > 0 && buf[end - 1] === 0x0d) end--; // CRLF
-  return buf.toString('utf8', 0, end);
+  return buf.toString('utf8');
 }
 
 /**
  * 平文の JSONL を offset から読む。onBatchBoundary は一定量ごとに呼ばれ、
  * 呼び出し側はそこで保存と読み取り位置の確定を行える（その時点の endOffset を渡す）。
  */
-export async function readPlainLines(
+export function readPlainLines(
   path: string,
   offset: number,
   onLine: LineHandler,
+  onBatchBoundary?: (endOffset: number) => void | Promise<void>,
+  batchBytes = 8 * CHUNK,
+): Promise<ReadResult> {
+  return readPlainLineBuffers(path, offset, (b, o) => onLine(decodeLine(b), o), onBatchBoundary, batchBytes);
+}
+
+/**
+ * readPlainLines のバイト版。渡すバッファは読み取り用の領域を指すことがあるため、呼び出し側は保持してはならない。
+ * 行ごとの処理が同期なら await しない（数百万行で待ち合わせの費用が積み上がるため）。
+ */
+export async function readPlainLineBuffers(
+  path: string,
+  offset: number,
+  onLine: LineBufferHandler,
   onBatchBoundary?: (endOffset: number) => void | Promise<void>,
   batchBytes = 8 * CHUNK,
 ): Promise<ReadResult> {
@@ -48,8 +72,9 @@ export async function readPlainLines(
       const { bytesRead } = await fh.read(buf, 0, CHUNK, pos);
       if (bytesRead === 0) break;
       let start = 0;
-      for (let i = 0; i < bytesRead; i++) {
-        if (buf[i] !== NL) continue;
+      const view = buf.subarray(0, bytesRead);
+      // 改行の検索は組み込みの indexOf で行う（1バイトずつの比較は数GBのログで遅いため）
+      for (let i = view.indexOf(NL); i >= 0; i = view.indexOf(NL, i + 1)) {
         const piece = buf.subarray(start, i);
         let lineBuf: Buffer;
         if (pendingLen > 0) {
@@ -65,7 +90,8 @@ export async function readPlainLines(
         pendingStart = endOffset;
         start = i + 1;
         if (lineBuf.length > 0) {
-          await onLine(decodeLine(lineBuf), lineStart);
+          const r = onLine(stripCr(lineBuf), lineStart);
+          if (isPromise(r)) await r;
           lines++;
         }
         if (onBatchBoundary && endOffset - lastBoundary >= batchBytes) {
@@ -87,7 +113,12 @@ export async function readPlainLines(
 }
 
 /** zstd 圧縮の JSONL を最初から読む。最後の行は改行が無くても完成した行として扱う。 */
-export async function readZstdLines(path: string, onLine: LineHandler): Promise<ReadResult> {
+export function readZstdLines(path: string, onLine: LineHandler): Promise<ReadResult> {
+  return readZstdLineBuffers(path, (b, o) => onLine(decodeLine(b), o));
+}
+
+/** readZstdLines のバイト版。offset は展開後のバイト位置。 */
+export async function readZstdLineBuffers(path: string, onLine: LineBufferHandler): Promise<ReadResult> {
   const stream = createReadStream(path).pipe(createZstdDecompress());
   let pending: Buffer[] = [];
   let pendingLen = 0;
@@ -95,8 +126,7 @@ export async function readZstdLines(path: string, onLine: LineHandler): Promise<
   let lines = 0;
   for await (const chunk of stream as AsyncIterable<Buffer>) {
     let start = 0;
-    for (let i = 0; i < chunk.length; i++) {
-      if (chunk[i] !== NL) continue;
+    for (let i = chunk.indexOf(NL); i >= 0; i = chunk.indexOf(NL, i + 1)) {
       const piece = chunk.subarray(start, i);
       const lineBuf = pendingLen > 0 ? Buffer.concat([...pending, piece], pendingLen + piece.length) : piece;
       pending = [];
@@ -105,7 +135,8 @@ export async function readZstdLines(path: string, onLine: LineHandler): Promise<
       offset += lineBuf.length + 1;
       start = i + 1;
       if (lineBuf.length > 0) {
-        await onLine(decodeLine(lineBuf), lineStart);
+        const r = onLine(stripCr(lineBuf), lineStart);
+        if (isPromise(r)) await r;
         lines++;
       }
     }
@@ -117,7 +148,8 @@ export async function readZstdLines(path: string, onLine: LineHandler): Promise<
   }
   if (pendingLen > 0) {
     const lineBuf = Buffer.concat(pending, pendingLen);
-    await onLine(decodeLine(lineBuf), offset);
+    const r = onLine(stripCr(lineBuf), offset);
+    if (isPromise(r)) await r;
     offset += lineBuf.length;
     lines++;
   }

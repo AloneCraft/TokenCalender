@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, type AppStatus, type Settings } from '../shared/api.t
 import * as v from '../shared/validate.ts';
 import { windowKindFromMinutes, type QuotaObservation } from '../core/model/types.ts';
 import { ensureDemoDb } from '../demo/generate.ts';
+import { planOverview, ratesFor, simulatePlan } from './plan.ts';
 
 /** 状態表示のモデル・プロジェクト一覧は直近120日から作る（全期間の集計は遅いため） */
 const RECENT_MS = 120 * 86400000;
@@ -70,6 +71,20 @@ export function handleCommand(method: string, params: unknown, ctx: CommandConte
     }
     case 'analysis':
       return service.analysis(v.analysisRequest(params));
+    case 'planOverview': {
+      const s = readSettings(db);
+      const o = params as Record<string, unknown>;
+      return planOverview(service.database, {
+        now: Date.now(),
+        zone: v.str(o?.zone, 'zone', 64),
+        demo: s.demo,
+        settings: { reservePct: s.reservePct, weekdayWeights: s.budgetWeekdayWeights },
+      });
+    }
+    case 'rates':
+      return ratesFor(service.database, v.ratesRequest(params), Date.now());
+    case 'simulate':
+      return simulatePlan(service.database, v.simulateRequest(params), Date.now());
     case 'addManualObservation': {
       const m = v.manualObservation(params);
       const obs: QuotaObservation = {

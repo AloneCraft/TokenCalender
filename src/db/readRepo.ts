@@ -264,20 +264,27 @@ export interface IntervalStats {
   output: number;
   reasoning: number;
   unclassified: number;
+  /** 小区間内の異なるターン数・セッション数。小区間をまたぐターンは両方で数えるため、足し合わせると多めになる */
+  turns: number;
+  sessions: number;
 }
 
 export function zeroStats(): IntervalStats {
-  return { tokens: 0, cost: 0, unpricedTokens: 0, unpricedEvents: 0, events: 0, flagged: 0, partial: 0, mixedBillingTokens: 0, unknownBillingTokens: 0, input: 0, cacheRead: 0, cacheWrite: 0, output: 0, reasoning: 0, unclassified: 0 };
+  return { tokens: 0, cost: 0, unpricedTokens: 0, unpricedEvents: 0, events: 0, flagged: 0, partial: 0, mixedBillingTokens: 0, unknownBillingTokens: 0, input: 0, cacheRead: 0, cacheWrite: 0, output: 0, reasoning: 0, unclassified: 0, turns: 0, sessions: 0 };
 }
 
 export function addStats(a: IntervalStats, b: IntervalStats): void {
   for (const k of Object.keys(a) as (keyof IntervalStats)[]) a[k] += b[k];
 }
 
-export type DimSql = 'none' | 'provider' | 'model' | 'project' | 'effort' | 'billing' | 'account' | 'sidechain' | 'token_type';
+export type DimSql = 'none' | 'provider' | 'model' | 'project' | 'effort' | 'billing' | 'account' | 'sidechain' | 'token_type' | 'model_effort';
+
+/** model_effort の値の区切り（モデル名とエフォートに現れない文字） */
+export const MODEL_EFFORT_SEP = '|';
 
 const DIM_EXPR: Record<DimSql, string> = {
   none: "'all'",
+  model_effort: `COALESCE(model, 'unknown') || '${MODEL_EFFORT_SEP}' || COALESCE(effort, 'unknown')`,
   token_type: "'all'",
   provider: 'provider',
   model: "COALESCE(model, 'unknown')",
@@ -292,7 +299,9 @@ const DIM_EXPR: Record<DimSql, string> = {
  * 境界 boundaries（昇順）で区切った小区間 [b_i, b_{i+1}) ごとに、切り口 dim 別の集計値を返す。
  * 時刻の索引で各小区間を範囲検索するため、イベント全件を読み出すより速い。
  */
-export function intervalStats(db: Db, f: EventFilter, boundaries: number[], dim: DimSql): Map<string, IntervalStats>[] {
+export function intervalStats(db: Db, f: EventFilter, boundaries: number[], dim: DimSql, opts: { counts?: boolean } = {}): Map<string, IntervalStats>[] {
+  // 異なるターン数・セッション数は数えるのが重いため、必要なとき（消費率の推定）だけ数える
+  const counts = opts.counts === true ? 'COUNT(DISTINCT e.turn_id) tn, COUNT(DISTINCT e.session_id) sn' : '0 tn, 0 sn';
   const out: Map<string, IntervalStats>[] = [];
   for (let i = 0; i + 1 < boundaries.length; i++) out.push(new Map());
   if (out.length === 0) return out;
@@ -323,7 +332,8 @@ export function intervalStats(db: Db, f: EventFilter, boundaries: number[], dim:
         SUM(e.total) tokens, SUM(CASE WHEN e.priced = 1 THEN e.cost_nano ELSE 0 END) cost,
         SUM(CASE WHEN COALESCE(e.priced, 0) = 0 THEN e.total ELSE 0 END) ut, SUM(COALESCE(e.priced, 0) = 0) ue, COUNT(*) n,
         SUM(e.flags != '[]') fl, SUM(e.finality = 0) pa, SUM(CASE WHEN e.billing_mode IN ('api','extra_credit') THEN e.total ELSE 0 END) mx, SUM(CASE WHEN e.billing_mode = 'unknown' THEN e.total ELSE 0 END) ub,
-        SUM(e.input_uncached) inp, SUM(e.cache_read) cr, SUM(e.cache_write) cw, SUM(e.output) outp, SUM(COALESCE(e.reasoning, 0)) rs, SUM(e.unclassified) uc
+        SUM(e.input_uncached) inp, SUM(e.cache_read) cr, SUM(e.cache_write) cw, SUM(e.output) outp, SUM(COALESCE(e.reasoning, 0)) rs, SUM(e.unclassified) uc,
+        ${counts}
       FROM b JOIN usage_events e ON e.ts >= b.s AND e.ts < b.t
       WHERE 1 = 1 ${where}
       GROUP BY b.i, d`;
@@ -345,6 +355,8 @@ export function intervalStats(db: Db, f: EventFilter, boundaries: number[], dim:
         output: Number(r.outp),
         reasoning: Number(r.rs),
         unclassified: Number(r.uc),
+        turns: Number(r.tn),
+        sessions: Number(r.sn),
       });
     }
   }

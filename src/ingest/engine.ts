@@ -10,7 +10,7 @@ import { STATUSLINE_PARSER_VERSION, parseBridgeLine } from '../core/quota/claude
 import { inTransaction, type Db } from '../db/database.ts';
 import { WriteRepo, type FileCursor } from '../db/writeRepo.ts';
 import { fileKeyFor, rolloutBaseName, scanSource, type FileInfo, type SourceDef } from './discovery.ts';
-import { headFingerprint, readPlainLines, readZstdLines, sameHead } from './lineReader.ts';
+import { headFingerprint, readPlainLineBuffers, readZstdLineBuffers, sameHead } from './lineReader.ts';
 
 export interface IngestProgress {
   phase: 'idle' | 'scanning' | 'watching';
@@ -287,14 +287,15 @@ export class IngestEngine {
     const parser = this.makeParser(def, file, state, settings);
     let out: ParseOutput = emptyParseOutput();
 
-    const feed = (line: string, off: number) => {
+    const feed = (buf: Buffer, off: number) => {
       result.lines++;
       if (parser.kind === 'statusline') {
+        const line = buf.toString('utf8');
         const obs = parseBridgeLine(line, parser.accountKey, `${parser.fileKey}@${off}`);
         if (obs.length === 0 && line.trim()) out.badLines++;
         out.quota.push(...obs);
       } else {
-        parser.p.feed(line, off, out);
+        parser.p.feedBytes(buf, off, out);
       }
     };
 
@@ -333,14 +334,14 @@ export class IngestEngine {
     if (file.compressed) {
       let processed = 0;
       // 圧縮ファイルは途中から再開できないため、途中の保存では読み取り位置を「未完了」にしておく
-      await readZstdLines(file.path, async (line, off) => {
-        feed(line, off);
-        processed = off + line.length + 1;
-        if (out.events.length >= FLUSH_EVENTS) await flush(0, false);
+      await readZstdLineBuffers(file.path, (buf, off) => {
+        feed(buf, off);
+        processed = off + buf.length + 1;
+        if (out.events.length >= FLUSH_EVENTS) return flush(0, false);
       });
       await flush(processed, true);
     } else {
-      const r = await readPlainLines(file.path, offset, feed, async (end) => flush(end, false));
+      const r = await readPlainLineBuffers(file.path, offset, feed, async (end) => flush(end, false));
       await flush(r.endOffset, false);
     }
 

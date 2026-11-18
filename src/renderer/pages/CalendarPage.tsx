@@ -4,7 +4,7 @@ import { api } from '../api.ts';
 import { commonFilter, useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { BarDefs, DayBar } from '../components/DayBar.tsx';
-import { colorFor, fmtMeasure, fmtMoney, fmtTokens } from '../format.ts';
+import { colorFor, fmtMeasure, fmtMoney, fmtTokens, windowKeyLabel } from '../format.ts';
 import type { CalendarRequest, CalendarResponse, DayCell, TimelineResponse } from '../../shared/api.ts';
 import { RecentPanel } from '../components/RecentPanel.tsx';
 import { QuotaPanel } from '../components/QuotaPanel.tsx';
@@ -119,13 +119,13 @@ export function CalendarPage({ onOpenEstimate }: { onOpenEstimate: () => void })
                 {measure === 'cost' && <span className="faint">{t('common.apiEquivalent')}</span>}
                 {measure === 'cost' && data.monthUnpricedTokens > 0 && (
                   <span className="badge warn" title={t('common.unpricedNote')}>
-                    {t('cal.unpriced')}: {fmtTokens(data.monthUnpricedTokens)} tok / {data.monthUnpricedEvents.toLocaleString()}件
+                    {t('cal.unpriced')}: {t('cal.unpricedCount', { tok: fmtTokens(data.monthUnpricedTokens), n: data.monthUnpricedEvents.toLocaleString() })}
                   </span>
                 )}
               </div>
               {mode === 'cumulative' && (
                 <span className="faint">
-                  {data.windowLabel ?? t('window.none')}
+                  {data.windowLabel ? (windowKeyLabel(filters.window) ?? data.windowLabel) : t('window.none')}
                   {data.cycleNote === 'partly_estimated' && <span className="badge est"> {t('cal.resetEstimated')}</span>}
                 </span>
               )}
@@ -175,8 +175,8 @@ export function CalendarPage({ onOpenEstimate }: { onOpenEstimate: () => void })
                       ) : mode === 'cumulative' ? (
                         <>
                           <div>+{fmtMeasure(inc.increment ?? c.total, measure, money)}</div>
-                          <div className="sub">{inc.cumulative != null ? `計 ${fmtMeasure(inc.cumulative, measure, money)}` : t('cal.cycleUnknown')}</div>
-                          {inc.resetInBucket && inc.oldCycleUsage > 0 && <div className="sub">日計 {fmtMeasure(c.total, measure, money)}</div>}
+                          <div className="sub">{inc.cumulative != null ? t('cal.cycleSum', { v: fmtMeasure(inc.cumulative, measure, money) }) : t('cal.cycleUnknown')}</div>
+                          {inc.resetInBucket && inc.oldCycleUsage > 0 && <div className="sub">{t('cal.daySum', { v: fmtMeasure(c.total, measure, money) })}</div>}
                         </>
                       ) : (
                         <div>{fmtMeasure(c.total, measure, money)}</div>
@@ -240,7 +240,7 @@ export function CalendarPage({ onOpenEstimate }: { onOpenEstimate: () => void })
         <QuotaPanel onOpenEstimate={onOpenEstimate} />
         {measure === 'cost' && data && (
           <div className="faint">
-            {fmtMoney(1e9, money)} = 1 USD{money.currency === 'JPY' ? `（1 USD = ${settings.usdJpy} 円・手動設定）` : ''}
+            {fmtMoney(1e9, money)} = 1 USD{money.currency === 'JPY' ? t('cal.rateNote', { r: settings.usdJpy }) : ''}
           </div>
         )}
       </div>

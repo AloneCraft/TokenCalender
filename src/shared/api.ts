@@ -1,6 +1,9 @@
 // 画面（renderer）と裏側（main / 別スレッド）で共有する型。
 // 画面に渡すのは集計済みの値だけで、ログ本文やファイルパスは渡さない（データ元画面のフォルダー名を除く）。
 
+import type { PlanOverview, RatesView, SimulateRequest, SimulateResult } from './plan.ts';
+export type * from './plan.ts';
+
 export type Provider = 'claude' | 'codex';
 export type ProviderSel = Provider | 'both';
 export type Measure = 'tokens' | 'cost' | 'input' | 'cache_read' | 'cache_write' | 'output' | 'reasoning' | 'events';
@@ -368,9 +371,14 @@ export interface Settings {
   usdJpyUpdatedAt: number | null;
   pricingMode: PricingMode;
   theme: 'system' | 'light' | 'dark';
-  language: 'ja' | 'en';
+  /** system = OS の言語設定に合わせる（日本語なら日本語、それ以外は英語） */
+  language: 'system' | 'ja' | 'en';
   demo: boolean;
   extraSources: { provider: Provider; path: string }[];
+  /** リセット時に残しておきたい利用枠（ポイント） */
+  reservePct: number;
+  /** 1日ごとの予算の曜日の重み（月=0…日=6）。null なら過去の実績から求める */
+  budgetWeekdayWeights: number[] | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -381,9 +389,11 @@ export const DEFAULT_SETTINGS: Settings = {
   usdJpyUpdatedAt: null,
   pricingMode: 'historical',
   theme: 'system',
-  language: 'ja',
+  language: 'system',
   demo: false,
   extraSources: [],
+  reservePct: 5,
+  budgetWeekdayWeights: null,
 };
 
 export interface BridgePreview {
@@ -417,6 +427,9 @@ export interface TokenCalendarApi {
   quotaOverview(): Promise<QuotaOverview>;
   estimate(req: { windowKey: string; pricingMode: PricingMode }): Promise<EstimateView>;
   analysis(req: AnalysisRequest): Promise<AnalysisSeries>;
+  planOverview(req: { zone: string }): Promise<PlanOverview>;
+  rates(req: { provider: Provider; fromMs: number; toMs: number }): Promise<RatesView>;
+  simulate(req: SimulateRequest): Promise<SimulateResult>;
   addManualObservation(o: ManualObservationInput): Promise<{ ok: boolean; message: string | null }>;
   deleteManualObservation(id: number): Promise<{ ok: boolean }>;
   listManualObservations(): Promise<{ id: number; provider: Provider; limitId: string; windowMinutes: number | null; usedPercent: number | null; resetsAtMs: number | null; observedAtMs: number; note: string | null }[]>;

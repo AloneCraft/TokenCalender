@@ -11,6 +11,7 @@ import type {
   ManualObservationInput,
   Measure,
   Settings,
+  SimulateRequest,
   TimelineRequest,
 } from './api.ts';
 
@@ -153,6 +154,29 @@ export function manualObservation(v: unknown): ManualObservationInput {
   };
 }
 
+export function simulateRequest(v: unknown): SimulateRequest {
+  const o = obj(v, 'simulate');
+  const wd = o.workWeekdays;
+  if (!Array.isArray(wd) || wd.length > 7) fail('workWeekdays is invalid');
+  return {
+    windowKey: str(o.windowKey, 'windowKey', 512),
+    group: o.group == null ? null : str(o.group, 'group', 256),
+    turnsPerDay: num(o.turnsPerDay, 'turnsPerDay', 0, 10000),
+    workWeekdays: [...new Set((wd as unknown[]).map((x, i) => int(x, `workWeekdays[${i}]`, 0, 6)))],
+    workStartHour: int(o.workStartHour, 'workStartHour', 0, 23),
+    workHours: int(o.workHours, 'workHours', 1, 24),
+    zone: zone(o.zone),
+  };
+}
+
+export function ratesRequest(v: unknown): { provider: 'claude' | 'codex'; fromMs: number; toMs: number } {
+  const o = obj(v, 'rates');
+  const fromMs = num(o.fromMs, 'fromMs', 0, 8.64e15);
+  const toMs = num(o.toMs, 'toMs', 0, 8.64e15);
+  if (toMs <= fromMs || toMs - fromMs > 400 * 86400000) fail('range is invalid');
+  return { provider: oneOf(o.provider, 'provider', ['claude', 'codex'] as const), fromMs, toMs };
+}
+
 export function settingsPatch(v: unknown): Partial<Settings> {
   const o = obj(v, 'settings');
   const out: Partial<Settings> = {};
@@ -163,8 +187,16 @@ export function settingsPatch(v: unknown): Partial<Settings> {
   if ('usdJpyUpdatedAt' in o) out.usdJpyUpdatedAt = o.usdJpyUpdatedAt === null ? null : num(o.usdJpyUpdatedAt, 'usdJpyUpdatedAt', 0, 8.64e15);
   if ('pricingMode' in o) out.pricingMode = oneOf(o.pricingMode, 'pricingMode', ['historical', 'current'] as const);
   if ('theme' in o) out.theme = oneOf(o.theme, 'theme', ['system', 'light', 'dark'] as const);
-  if ('language' in o) out.language = oneOf(o.language, 'language', ['ja', 'en'] as const);
+  if ('language' in o) out.language = oneOf(o.language, 'language', ['system', 'ja', 'en'] as const);
   if ('demo' in o) out.demo = bool(o.demo, 'demo');
+  if ('reservePct' in o) out.reservePct = num(o.reservePct, 'reservePct', 0, 50);
+  if ('budgetWeekdayWeights' in o) {
+    if (o.budgetWeekdayWeights === null) out.budgetWeekdayWeights = null;
+    else {
+      if (!Array.isArray(o.budgetWeekdayWeights) || o.budgetWeekdayWeights.length !== 7) fail('budgetWeekdayWeights is invalid');
+      out.budgetWeekdayWeights = (o.budgetWeekdayWeights as unknown[]).map((x, i) => num(x, `budgetWeekdayWeights[${i}]`, 0, 10));
+    }
+  }
   if ('extraSources' in o) {
     if (!Array.isArray(o.extraSources) || o.extraSources.length > 50) fail('extraSources is invalid');
     out.extraSources = o.extraSources.map((x, i) => {

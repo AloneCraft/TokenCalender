@@ -46,7 +46,7 @@ export function RecentPanel() {
         <span className={`badge ${STATE_BADGE[r.state] ?? ''}`}>{t(`recent.state.${r.state}`)}</span>
       </div>
       <div className="faint">
-        {r.projectLabel ?? '—'} ・ {r.sessionId.slice(0, 8)} ・ {fmtTime(r.startedAtMs, zone)}〜{fmtTime(r.lastUpdatedMs, zone)}（{fmtAgo(r.lastUpdatedMs, now)}）
+        {r.projectLabel ?? '—'} · {r.sessionId.slice(0, 8)} · {fmtTime(r.startedAtMs, zone)}–{fmtTime(r.lastUpdatedMs, zone)} ({fmtAgo(r.lastUpdatedMs, now)})
       </div>
       {first && (
         <>
@@ -61,9 +61,9 @@ export function RecentPanel() {
             </div>
           </div>
           <div className="faint" style={{ marginTop: 4 }}>
-            {t('measure.input')} {fmtTokens(r.turn.input)} ・ {t('measure.cache_read')} {fmtTokens(r.turn.cacheRead)} ・ {t('measure.cache_write')} {fmtTokens(r.turn.cacheWrite)} ・{' '}
+            {t('measure.input')} {fmtTokens(r.turn.input)} · {t('measure.cache_read')} {fmtTokens(r.turn.cacheRead)} · {t('measure.cache_write')} {fmtTokens(r.turn.cacheWrite)} ·{' '}
             {t('measure.output')} {fmtTokens(r.turn.output)}
-            {r.turn.reasoning > 0 ? `（${t('measure.reasoning')} ${fmtTokens(r.turn.reasoning)}）` : ''} ・ {r.requests} {t('recent.requests')}
+            {r.turn.reasoning > 0 ? ` (${t('measure.reasoning')} ${fmtTokens(r.turn.reasoning)})` : ''} · {r.requests} {t('recent.requests')}
           </div>
           {r.subagents.length > 0 && (
             <div className="faint">
@@ -75,7 +75,7 @@ export function RecentPanel() {
       )}
       {!first && (
         <div className="faint num">
-          {fmtTokens(r.turn.tokens)} ・ {r.turn.priced ? `${fmtMoney(r.turn.costNano, money)} ${t('common.equiv')}` : t('cal.unpriced')}
+          {fmtTokens(r.turn.tokens)} · {r.turn.priced ? `${fmtMoney(r.turn.costNano, money)} ${t('common.equiv')}` : t('cal.unpriced')}
         </div>
       )}
     </div>
@@ -92,7 +92,7 @@ export function RecentPanel() {
         data.items.map((r, i) => item(r, i === 0))
       )}
       <div className="faint" style={{ marginTop: 8 }}>
-        {t('recent.source')} ・ {t('common.freshness')}: {data?.items[0]?.ingestedAtMs ? fmtAgo(data.items[0].ingestedAtMs, now) : '—'}
+        {t('recent.source')} · {t('common.freshness')}: {data?.items[0]?.ingestedAtMs ? fmtAgo(data.items[0].ingestedAtMs, now) : '—'}
       </div>
       <div className="faint">{t('recent.liveNote')}</div>
     </section>

@@ -3,12 +3,13 @@
 
 import type { AnalysisSeries, Measure } from '../../shared/api.ts';
 import type { EChartsOption } from '../components/EChart.tsx';
-import { colorFor } from '../format.ts';
+import { colorFor, formatLocale } from '../format.ts';
 
 export interface ChartContext {
   measure: Measure;
   zone: string;
   fmt: (v: number) => string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }
 
 export interface ChartDef {
@@ -20,7 +21,7 @@ export interface ChartDef {
 }
 
 const timeLabel = (ms: number, zone: string, step: number) =>
-  new Date(ms).toLocaleString('ja-JP', { timeZone: zone, month: 'numeric', day: 'numeric', ...(step < 1440 ? { hour: '2-digit', minute: '2-digit' } : {}) });
+  new Date(ms).toLocaleString(formatLocale(), { timeZone: zone, month: 'numeric', day: 'numeric', ...(step < 1440 ? { hour: '2-digit', minute: '2-digit' } : {}) });
 
 export const CHARTS: ChartDef[] = [
   {
@@ -80,10 +81,10 @@ export const CHARTS: ChartDef[] = [
       let max = 0;
       m.forEach((row, d) => row.forEach((v, h) => (data.push([h, d, v]), (max = Math.max(max, v)))));
       return {
-        tooltip: { formatter: (p: { value: [number, number, number] }) => `${'月火水木金土日'[p.value[1]]} ${p.value[0]}時: ${c.fmt(p.value[2])}` },
+        tooltip: { formatter: (p: { value: [number, number, number] }) => c.t('an.hourTip', { wd: c.t(`wd.${p.value[1]}`), h: p.value[0], v: c.fmt(p.value[2]) }) },
         grid: { left: 40, right: 24, top: 16, bottom: 70 },
         xAxis: { type: 'category', data: Array.from({ length: 24 }, (_, i) => `${i}`) },
-        yAxis: { type: 'category', data: ['月', '火', '水', '木', '金', '土', '日'] },
+        yAxis: { type: 'category', data: [0, 1, 2, 3, 4, 5, 6].map((i) => c.t(`wd.${i}`)) },
         visualMap: { min: 0, max: max || 1, calculable: true, orient: 'horizontal', left: 'center', bottom: 0 },
         series: [{ type: 'heatmap', data, label: { show: false } }],
       };
@@ -100,7 +101,7 @@ export const CHARTS: ChartDef[] = [
       xAxis: { type: 'category', data: s.buckets.map((b) => timeLabel(b.startMs, c.zone, 1440)) },
       yAxis: { type: 'value', min: 0, max: 1, axisLabel: { formatter: (v: number) => `${Math.round(v * 100)}%` } },
       dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 4 }],
-      series: [{ type: 'line', name: 'キャッシュ読み取り ÷ 入力全体', data: s.buckets.map((b) => (Number.isFinite(b.total) ? b.total : null)) }],
+      series: [{ type: 'line', name: c.t('an.cacheRatioName'), data: s.buckets.map((b) => (Number.isFinite(b.total) ? b.total : null)) }],
     }),
   },
   {
@@ -111,8 +112,8 @@ export const CHARTS: ChartDef[] = [
     build: (s, c) => ({
       tooltip: { trigger: 'axis' },
       grid: { left: 56, right: 24, top: 24, bottom: 56 },
-      xAxis: { type: 'category', name: 'セッションの合計（以上）', data: s.buckets.map((b) => c.fmt(b.startMs)) },
-      yAxis: { type: 'value', name: 'セッション数' },
+      xAxis: { type: 'category', name: c.t('an.sessionTotal'), data: s.buckets.map((b) => c.fmt(b.startMs)) },
+      yAxis: { type: 'value', name: c.t('an.sessionCount') },
       series: [{ type: 'bar', data: s.buckets.map((b) => b.total) }],
     }),
   },

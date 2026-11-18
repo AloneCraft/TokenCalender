@@ -230,9 +230,11 @@ export class WriteRepo {
    * 手動記録は間引かない。
    */
   insertQuota(obs: QuotaObservation[], now: number, note: string | null = null): number {
+    // IS で比べる（NULL どうしも一致する）。COALESCE で包むと索引の window_minutes と observed_at が使われず、
+    // 観測が増えるほど1件ごとの確認が遅くなる（実ログの初回取り込みで約20分の差が出た）。
     const dup = this.st.get(`
-      SELECT 1 FROM quota_observations WHERE provider = ? AND COALESCE(account_key, '') = COALESCE(?, '') AND limit_id = ?
-        AND COALESCE(window_minutes, -1) = COALESCE(?, -1) AND observed_at >= ? AND observed_at < ?
+      SELECT 1 FROM quota_observations WHERE provider = ? AND account_key IS ? AND limit_id = ?
+        AND window_minutes IS ? AND observed_at >= ? AND observed_at < ?
         AND used_percent IS ? AND resets_at IS ? LIMIT 1`);
     const latest = this.st.get(`
       INSERT INTO quota_latest(window_key, provider, account_key, limit_id, window_kind, window_minutes, scope_models, plan_type, observed_at, used_percent, resets_at, source, precision, flags)

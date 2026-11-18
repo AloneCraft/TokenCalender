@@ -34,13 +34,13 @@ export function EstimatePage() {
       grid: { left: 64, right: 56, top: 30, bottom: 50 },
       xAxis: { type: 'time' },
       yAxis: [
-        { type: 'value', name: '公式利用率 %', min: 0, max: 100 },
-        { type: 'value', name: 'ローカル使用量（1時間）', axisLabel: { formatter: (v: number) => fmtTokens(v) }, splitLine: { show: false } },
+        { type: 'value', name: t('est.chart.pct'), min: 0, max: 100 },
+        { type: 'value', name: t('est.chart.localAxis'), axisLabel: { formatter: (v: number) => fmtTokens(v) }, splitLine: { show: false } },
       ],
       dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 4 }],
       series: [
         {
-          name: '公式利用率（観測値）',
+          name: t('est.chart.official'),
           type: 'line',
           step: 'end',
           showSymbol: true,
@@ -48,14 +48,14 @@ export function EstimatePage() {
           data: est.observations.map((o) => [o.atMs, o.usedPercent]),
         },
         {
-          name: 'ローカル使用量（トークン）',
+          name: t('est.chart.local'),
           type: 'bar',
           yAxisIndex: 1,
           itemStyle: { color: '#9fc2ef' },
           data: est.localHourly.map((h) => [h.atMs, h.tokens]),
         },
         {
-          name: '採用した区間',
+          name: t('est.chart.adopted'),
           type: 'line',
           data: [],
           markArea: {
@@ -66,7 +66,7 @@ export function EstimatePage() {
         },
       ],
     };
-  }, [est]);
+  }, [est, t]);
 
   const range = (r: Range | null, kind: 'tokens' | 'cost') =>
     r ? (kind === 'cost' ? `${fmtMoney(roundSig(r.low), money)}〜${fmtMoney(roundSig(r.high), money)}` : `${fmtTokens(roundSig(r.low))}〜${fmtTokens(roundSig(r.high))}`) : '—';
@@ -88,8 +88,8 @@ export function EstimatePage() {
                 {windows.map((w) => (
                   <option key={w.key} value={w.key}>
                     {w.provider === 'claude' ? 'Claude' : 'Codex'} {windowName(w.windowMinutes)}
-                    {w.limitId !== w.provider ? `（${w.limitId}）` : ''}
-                    {w.accountKey ? ` (${w.accountKey.slice(-6)})` : ''}（観測 {w.count.toLocaleString()}）
+                    {w.limitId !== w.provider ? ` (${w.limitId})` : ''}
+                    {w.accountKey ? ` (${w.accountKey.slice(-6)})` : ''} ({t('est.windowObs', { n: w.count.toLocaleString() })})
                   </option>
                 ))}
               </select>
@@ -111,7 +111,7 @@ export function EstimatePage() {
                 <div className="metric">
                   <div className="label">
                     {t('est.capacityCost')}
-                    {isRef ? `・${t('est.reference')}` : ''}
+                    {isRef ? ` · ${t('est.reference')}` : ''}
                   </div>
                   <div className="big">{est.costEstimateSuppressed ? '—' : range(capC, 'cost')}</div>
                   {capC && !est.costEstimateSuppressed && (
@@ -124,7 +124,7 @@ export function EstimatePage() {
                 <div className="metric">
                   <div className="label">
                     {t('est.capacityTokens')}
-                    {isRef ? `・${t('est.reference')}` : ''}
+                    {isRef ? ` · ${t('est.reference')}` : ''}
                   </div>
                   <div className="big">{range(capT, 'tokens')}</div>
                   {capT && (
@@ -143,10 +143,10 @@ export function EstimatePage() {
                 </dd>
                 <dt>{t('est.segments')}</dt>
                 <dd>
-                  {t('est.adopted')} {est.adoptedCount} ／ {t('est.excluded')} {est.excludedCount}
+                  {t('est.adopted')} {est.adoptedCount} / {t('est.excluded')} {est.excludedCount}
                 </dd>
                 <dt>{t('est.spread')}</dt>
-                <dd>{est.spreadRatio == null ? '—' : `±${Math.round(est.spreadRatio * 50)}%（四分位の幅）`}</dd>
+                <dd>{est.spreadRatio == null ? '—' : t('est.spreadValue', { v: Math.round(est.spreadRatio * 50) })}</dd>
                 <dt>{t('est.unknownBilling')}</dt>
                 <dd>{fmtPct(est.unknownBillingShare * 100)}</dd>
                 <dt>{t('est.modelMix')}</dt>
@@ -162,9 +162,9 @@ export function EstimatePage() {
         </div>
         {option && (
           <div className="card">
-            <h2>公式利用率とローカル使用量</h2>
-            <EChart option={option} className="chart tall" ariaLabel="公式利用率とローカル使用量の重ね図" />
-            <div className="faint">緑の帯は推定に採用した区間です。利用率の線は観測値で、観測の無い時刻の値ではありません。</div>
+            <h2>{t('est.overlayTitle')}</h2>
+            <EChart option={option} className="chart tall" ariaLabel={t('est.overlayTitle')} />
+            <div className="faint">{t('est.overlayNote')}</div>
           </div>
         )}
         {est && est.segments.length > 0 && (
@@ -173,12 +173,12 @@ export function EstimatePage() {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>区間</th>
+                  <th>{t('est.col.interval')}</th>
                   <th className="r">Δ%</th>
-                  <th className="r">トークン</th>
+                  <th className="r">{t('est.col.tokens')}</th>
                   <th className="r">{t('measure.cost')}</th>
-                  <th className="r">容量（API料金換算）</th>
-                  <th>判定</th>
+                  <th className="r">{t('est.col.capacityCost')}</th>
+                  <th>{t('est.col.verdict')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,14 +215,14 @@ export function EstimatePage() {
       <div className="stack">
         {est && (
           <div className="card">
-            <h2>残量とペース</h2>
+            <h2>{t('est.paceTitle')}</h2>
             {est.pace.official ? (
               <dl className="kv stacked">
                 <dt>{t('pace.official')}</dt>
                 <dd>
-                  {fmtPct(est.pace.official.remainingPercent)}（使用 {fmtPct(est.pace.official.usedPercent)}）
+                  {fmtPct(est.pace.official.remainingPercent)}{t('est.usedParen', { pct: fmtPct(est.pace.official.usedPercent) })}
                   <div className="faint">
-                    {t(`quota.source.${est.pace.official.source}`)} ・ {t('quota.observed')} {fmtAgo(est.pace.official.observedAtMs, now)}
+                    {t(`quota.source.${est.pace.official.source}`)} · {t('quota.observed')} {fmtAgo(est.pace.official.observedAtMs, now)}
                     {est.pace.official.stale && <span className="badge warn"> {t('quota.stale')}</span>}
                   </div>
                 </dd>
@@ -231,18 +231,18 @@ export function EstimatePage() {
                 <dt>{t('pace.aux')}</dt>
                 <dd>
                   {est.pace.auxiliary
-                    ? `使用 ${fmtPct(est.pace.auxiliary.usedPercent.low)}〜${fmtPct(est.pace.auxiliary.usedPercent.high)}（＋${fmtTokens(est.pace.auxiliary.localTokensSince)} tok）`
+                    ? t('est.auxValue', { low: fmtPct(est.pace.auxiliary.usedPercent.low), high: fmtPct(est.pace.auxiliary.usedPercent.high), tok: fmtTokens(est.pace.auxiliary.localTokensSince) })
                     : '—'}
-                  <div className="faint">推定です。公式値の代わりではありません。</div>
+                  <div className="faint">{t('est.auxNote')}</div>
                 </dd>
                 <dt>{t('pace.burn')}</dt>
-                <dd>{est.pace.burnRatePctPerHour == null ? '—' : `${est.pace.burnRatePctPerHour.toFixed(1)} ポイント/時`}</dd>
+                <dd>{est.pace.burnRatePctPerHour == null ? '—' : t('est.perHour', { v: est.pace.burnRatePctPerHour.toFixed(1) })}</dd>
                 <dt>{t('pace.even')}</dt>
-                <dd>{est.pace.evenPacePctPerHour == null ? '—' : `${est.pace.evenPacePctPerHour.toFixed(2)} ポイント/時`}</dd>
+                <dd>{est.pace.evenPacePctPerHour == null ? '—' : t('est.perHour', { v: est.pace.evenPacePctPerHour.toFixed(2) })}</dd>
                 <dt>{t('pace.exhaust')}</dt>
                 <dd>
                   {est.pace.projectedExhaustion
-                    ? `${fmtDateTime(est.pace.projectedExhaustion.earliestMs, zone)} 〜 ${Number.isFinite(est.pace.projectedExhaustion.latestMs) ? fmtDateTime(est.pace.projectedExhaustion.latestMs, zone) : '未定'}（予測）`
+                    ? t('est.exhaustRange', { a: fmtDateTime(est.pace.projectedExhaustion.earliestMs, zone), b: Number.isFinite(est.pace.projectedExhaustion.latestMs) ? fmtDateTime(est.pace.projectedExhaustion.latestMs, zone) : t('est.undetermined') })
                     : '—'}
                 </dd>
               </dl>

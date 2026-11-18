@@ -67,9 +67,10 @@ function makeEnv(withData: boolean): Env {
   return { root, home, dataDir, codexFile };
 }
 
-async function launch(env: Env): Promise<{ app: ElectronApplication; page: Page }> {
+async function launch(env: Env, lang = 'ja-JP'): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    // 表示言語は既定で OS に合わせるため、試験では --lang で OS の言語を固定する
+    args: ['out/main/index.js', `--lang=${lang}`],
     env: {
       ...process.env,
       // OS のホームは変えず、ログを探す場所だけを差し替える
@@ -83,6 +84,11 @@ async function launch(env: Env): Promise<{ app: ElectronApplication; page: Page 
   const page = await app.firstWindow();
   await page.waitForSelector('nav');
   return { app, page };
+}
+
+/** 起動直後はダッシュボードが開く。カレンダーの試験はカレンダーへ移ってから行う */
+async function openCalendar(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /カレンダー/ }).click();
 }
 
 test.describe('Token Calendar', () => {
@@ -102,6 +108,7 @@ test.describe('Token Calendar', () => {
   test('N: 起動前の直近ターンを表示し、起動後に追加されたターンを約2秒以内に反映する', async () => {
     env = makeEnv(true);
     ({ app, page } = await launch(env));
+    await openCalendar(page);
     const first = page.getByTestId('recent-first');
     const recent = page.locator('section[aria-labelledby="recent-h"]');
     // 起動前に完了したターン（Claude 9分前・Codex 58分前）の両方を表示する
@@ -128,6 +135,7 @@ test.describe('Token Calendar', () => {
   test('カレンダーに棒を描き、周期内累積と公式利用率を区別して表示する', async () => {
     env = makeEnv(true);
     ({ app, page } = await launch(env));
+    await openCalendar(page);
     await expect(page.locator('.cal-grid button.cell')).toHaveCount(42, { timeout: 20000 });
     await expect(page.locator('.cell.today svg rect').first()).toBeVisible({ timeout: 20000 });
     // Codex を選び、周期内累積へ切り替える
@@ -158,10 +166,39 @@ test.describe('Token Calendar', () => {
   test('R: データが無い環境では空の状態を示し、デモ表示は明示する', async () => {
     env = makeEnv(false);
     ({ app, page } = await launch(env));
+    // ダッシュボード: 公式値が無いことを明示し、架空の数値を出さない
+    await expect(page.locator('section[aria-label="Codex"]')).toContainText('公式の利用率がまだ取得できていない', { timeout: 20000 });
+    await openCalendar(page);
     await expect(page.locator('section[aria-labelledby="recent-h"]')).toContainText('まだ利用の記録がありません', { timeout: 20000 });
     await expect(page.locator('.cell.today .vals')).toContainText('未取得');
     await page.getByRole('button', { name: /設定/ }).click();
     await page.getByLabel('デモ表示（架空のデータ）').click();
     await expect(page.locator('.banner.demo')).toContainText('デモ表示中', { timeout: 20000 });
+  });
+
+  test('ダッシュボード: 公式の残り・リセットまでの時間を、公式値の札つきで最初に表示する', async () => {
+    env = makeEnv(true);
+    ({ app, page } = await launch(env));
+    const codex = page.locator('section[aria-label^="Codex"]').first();
+    await expect(codex).toContainText('週枠', { timeout: 20000 });
+    // 最新の公式値は 30% 使用 → 残り 70%
+    await expect(codex.locator('.metric').first()).toContainText('70%');
+    await expect(codex.locator('.metric').first()).toContainText('公式');
+    await expect(codex).toContainText('リセットまで');
+    // Claude は公式値が無いので、残りを推測で出さない
+    await expect(page.locator('section[aria-label="Claude"]')).toContainText('公式の利用率がまだ取得できていない');
+    // 消費率のページへ移れる
+    // ダッシュボード内の「消費率の詳しい表…」ボタンと区別するため、名前の完全一致で探す
+    await page.getByRole('button', { name: '消費率', exact: true }).click();
+    await expect(page.locator('h1')).toContainText('モデル・エフォート別の消費率');
+  });
+
+  test('OS の言語が英語なら英語で表示する', async () => {
+    env = makeEnv(true);
+    ({ app, page } = await launch(env, 'en-US'));
+    await expect(page.locator('h1')).toContainText('Usage dashboard', { timeout: 20000 });
+    await expect(page.locator('nav')).toContainText('Calendar');
+    await expect(page.locator('nav')).toContainText('Limits');
+    await expect(page.locator('section[aria-label^="Codex"]').first()).toContainText('Remaining', { timeout: 20000 });
   });
 });

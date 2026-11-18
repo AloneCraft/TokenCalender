@@ -44,7 +44,7 @@ export function QuotaPanel({ onOpenEstimate }: { onOpenEstimate: () => void }) {
                   {w.limitId !== w.provider ? `（${w.limitId}）` : ''}
                 </span>
                 <span className="faint">
-                  {t(`quota.source.${l?.source ?? 'codex_log'}`)} ・ {t('quota.observed')} {fmtAgo(l?.observedAtMs ?? null, now)}
+                  {t(`quota.source.${l?.source ?? 'codex_log'}`)} · {t('quota.observed')} {fmtAgo(l?.observedAtMs ?? null, now)}
                   {l?.stale && <span className="badge warn"> {t('quota.stale')}</span>}
                 </span>
               </div>
@@ -102,7 +102,7 @@ export function QuotaPanel({ onOpenEstimate }: { onOpenEstimate: () => void }) {
           })()}
           {est.pace.outlook !== 'unknown' && (
             <div className={`note ${est.pace.outlook === 'runs_out' ? 'warn' : ''}`} style={{ marginTop: 6 }}>
-              {t(`pace.outlook.${est.pace.outlook}`)}（推定）
+              {t(`pace.outlook.${est.pace.outlook}`)} ({t('dash.tag.estimate')})
             </div>
           )}
           <div className="faint">{t('est.meaning')}</div>

@@ -57,7 +57,7 @@ function handle(channel: string, fn: (params: unknown) => unknown): void {
 }
 
 function registerIpc(): void {
-  const forward = ['calendar', 'timeline', 'dayDetail', 'recent', 'quotaOverview', 'estimate', 'analysis', 'addManualObservation', 'deleteManualObservation', 'listManualObservations', 'updateSource', 'getSettings'];
+  const forward = ['calendar', 'timeline', 'dayDetail', 'recent', 'quotaOverview', 'estimate', 'analysis', 'planOverview', 'rates', 'simulate', 'addManualObservation', 'deleteManualObservation', 'listManualObservations', 'updateSource', 'getSettings'];
   for (const m of forward) handle(m, (p) => hub.call(m, p ?? null));
 
   handle('setSettings', async (p) => {

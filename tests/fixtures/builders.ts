@@ -1,8 +1,10 @@
 // 試験用の匿名ログを組み立てる。値は手計算できる小さな数にしている。
 // 実在の会話・パス・ID は含まない。
 
-export function claudeUser(opts: { promptId: string; sessionId: string; ts: string; toolResult?: boolean; sidechain?: boolean }): string {
-  const content = opts.toolResult ? [{ type: 'tool_result', tool_use_id: 'toolu_x', content: 'ok' }] : 'prompt text';
+export function claudeUser(opts: { promptId: string; sessionId: string; ts: string; toolResult?: boolean; sidechain?: boolean; bigContentChars?: number }): string {
+  // bigContentChars: ツール結果のような大きな本文（多バイト文字・引用符を含む）を作る
+  const big = opts.bigContentChars ? '結果 "quoted" \\ '.repeat(Math.ceil(opts.bigContentChars / 14)).slice(0, opts.bigContentChars) : null;
+  const content = opts.toolResult || big ? [{ type: 'tool_result', tool_use_id: 'toolu_x', content: big ?? 'ok' }] : 'prompt text';
   return JSON.stringify({
     parentUuid: null,
     isSidechain: opts.sidechain === true,

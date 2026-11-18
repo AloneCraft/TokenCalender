@@ -20,7 +20,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
     const p = await api().pickFolder();
     if (!p) return;
     const r = await api().addSource({ provider, path: p });
-    setMsg(r.ok ? `追加しました: ${p}` : `追加できませんでした（${r.message}）`);
+    setMsg(r.ok ? t('src.added', { p }) : t('src.addFailed', { m: r.message ?? '' }));
   };
 
   return (
@@ -43,19 +43,26 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
             </button>
           </span>
         </div>
-        <div className="faint">元のログは読むだけで、変更・削除しません。「ローカルログが読めない」と「公式利用率が取れない」は別々の状態として表示します。</div>
+        <div className="faint">{t('src.lead')}</div>
         {msg && <div className="note">{msg}</div>}
         {progress && (
           <div className="faint" style={{ margin: '6px 0' }}>
-            {t('src.progress')}: {progress.phase} ・ {progress.filesDone.toLocaleString()} / {progress.filesTotal.toLocaleString()} ファイル ・ 追加 {progress.eventsInserted.toLocaleString()} 件 ・ 更新{' '}
-            {progress.eventsUpdated.toLocaleString()} 件 ・ エラー {progress.errors}
+            {t('src.progress')}:{' '}
+            {t('src.progressLine', {
+              phase: progress.phase,
+              done: progress.filesDone.toLocaleString(),
+              total: progress.filesTotal.toLocaleString(),
+              ins: progress.eventsInserted.toLocaleString(),
+              upd: progress.eventsUpdated.toLocaleString(),
+              err: progress.errors,
+            })}
           </div>
         )}
         <table className="tbl">
           <thead>
             <tr>
-              <th>データ元</th>
-              <th>状態</th>
+              <th>{t('src.col.source')}</th>
+              <th>{t('src.col.status')}</th>
               <th className="r">{t('src.files')}</th>
               <th>{t('src.account')}</th>
               <th>{t('src.billing')}</th>
@@ -74,13 +81,13 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                 <td>
                   <span className={`badge ${STATUS_BADGE[s.status] ?? ''}`}>{t(`src.status.${s.status}`)}</span>
                   {s.detail && <div className="faint">{s.detail}</div>}
-                  {s.filesWithErrors > 0 && <div className="faint">読めないファイル {s.filesWithErrors}</div>}
+                  {s.filesWithErrors > 0 && <div className="faint">{t('src.unreadable', { n: s.filesWithErrors })}</div>}
                   {s.badLines > 0 && (
                     <div className="faint">
                       {t('src.badLines')} {s.badLines}
                     </div>
                   )}
-                  <div className="faint">{s.lastScanAt ? `走査 ${fmtAgo(s.lastScanAt, now)}` : ''}</div>
+                  <div className="faint">{s.lastScanAt ? t('src.scanned', { ago: fmtAgo(s.lastScanAt, now) }) : ''}</div>
                 </td>
                 <td className="r">{s.fileCount.toLocaleString()}</td>
                 <td>
@@ -95,7 +102,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                     }}
                     style={{ width: 140 }}
                   />
-                  <div className="faint">ログに根拠が無い利用だけに関連付けます</div>
+                  <div className="faint">{t('src.accountNote')}</div>
                 </td>
                 <td>
                   <select
@@ -125,13 +132,13 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
         {wsl && (
           <div style={{ marginTop: 10 }}>
             <h3>WSL</h3>
-            {wsl.length === 0 && <div className="faint">見つかりませんでした</div>}
+            {wsl.length === 0 && <div className="faint">{t('src.notFound')}</div>}
             {wsl.map((w) => (
               <div key={w.path} className="row">
                 <span>
-                  {w.distro} ・ {w.provider} ・ <span className="faint">{w.path}</span>
+                  {w.distro} · {w.provider} · <span className="faint">{w.path}</span>
                 </span>
-                <button className="btn" onClick={() => void api().addSource({ provider: w.provider, path: w.path }).then(() => setMsg(`追加しました: ${w.path}`))}>
+                <button className="btn" onClick={() => void api().addSource({ provider: w.provider, path: w.path }).then(() => setMsg(t('src.added', { p: w.path })))}>
                   {t('src.add')}
                 </button>
               </div>
@@ -141,7 +148,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
       </div>
 
       <div className="card">
-        <h2>公式利用率の取得経路</h2>
+        <h2>{t('src.quotaRoutes')}</h2>
         <table className="tbl">
           <tbody>
             {(quota?.sources ?? []).map((s) => (
@@ -151,8 +158,8 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                   <span className={`badge ${s.status === 'ok' ? 'ok' : s.status === 'failed' ? 'danger' : ''}`}>{s.status}</span>
                 </td>
                 <td className="faint">
-                  {s.source === 'codex_app_server' ? '未実装（別プロセスの App Server が既存セッションの通知を受け取れるかは未検証）' : (s.detail ?? '')}
-                  {s.updatedAt ? ` ・ ${fmtAgo(s.updatedAt, now)}` : ''}
+                  {s.source === 'codex_app_server' ? t('src.appServerNote') : (s.detail ?? '')}
+                  {s.updatedAt ? ` · ${fmtAgo(s.updatedAt, now)}` : ''}
                 </td>
               </tr>
             ))}
@@ -174,7 +181,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                 void api()
                   .bridgeInstall()
                   .then((r) => {
-                    setMsg(r.ok ? `連携を有効にしました。バックアップ: ${r.message ?? 'なし（新規作成）'}` : `変更しませんでした（${r.message}）`);
+                    setMsg(r.ok ? t('bridge.enabled', { b: r.message ?? t('bridge.noBackup') }) : t('bridge.unchanged', { m: r.message ?? '' }));
                     return api().bridgePreview().then(setPreview);
                   })
               }
@@ -189,7 +196,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                 void api()
                   .bridgeUninstall()
                   .then((r) => {
-                    setMsg(r.ok ? '元に戻しました' : `変更しませんでした（${r.message}）`);
+                    setMsg(r.ok ? t('bridge.restored') : t('bridge.unchanged', { m: r.message ?? '' }));
                     return api().bridgePreview().then(setPreview);
                   })
               }
@@ -200,13 +207,13 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
         </div>
         {preview && (
           <div style={{ marginTop: 8 }}>
-            <div className="faint">対象: {preview.settingsPath}</div>
+            <div className="faint">{t('bridge.target', { p: preview.settingsPath })}</div>
             <h3>{t('bridge.current')}</h3>
-            <pre className="code">{JSON.stringify(preview.currentStatusLine, null, 2) ?? 'なし'}</pre>
+            <pre className="code">{JSON.stringify(preview.currentStatusLine, null, 2) ?? t('bridge.none')}</pre>
             <h3>{t('bridge.proposed')}</h3>
             <pre className="code">{JSON.stringify(preview.proposedStatusLine, null, 2)}</pre>
-            <div className="faint">連携スクリプト: {preview.scriptPath}</div>
-            <div className="faint">記録先（利用率とリセット時刻だけ）: {preview.outputPath}</div>
+            <div className="faint">{t('bridge.script', { p: preview.scriptPath })}</div>
+            <div className="faint">{t('bridge.output', { p: preview.outputPath })}</div>
             <div className="note" style={{ marginTop: 6 }}>
               {preview.note}
             </div>

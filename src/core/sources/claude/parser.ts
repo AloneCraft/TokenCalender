@@ -52,6 +52,14 @@ export function topLevelType(line: string): string | null {
   return TOP_TYPE_RE.exec(line.length > 4000 ? line.slice(0, 4000) : line)?.[1] ?? null;
 }
 
+const TYPE_KEY = Buffer.from('"type":"');
+const USER_TAIL = Buffer.from('user"');
+const PROMPT_KEY = Buffer.from('"promptId"');
+const MESSAGE_KEY = Buffer.from('"message"');
+const USAGE_KEY = Buffer.from('"usage"');
+const ASSISTANT_KEY = Buffer.from('"type":"assistant"');
+/** 利用者の行の末尾から変換する長さ。timestamp と sessionId は本文の後ろ、行末から約0.5KB以内にある（実ログで確認） */
+const USER_TAIL_BYTES = 4096;
 const PROMPT_ID_RE = /"promptId":"([^"]+)"/;
 const TIMESTAMP_RE = /"timestamp":"([^"]+)"/;
 const SESSION_RE = /"sessionId":"([^"]+)"/;
@@ -67,6 +75,35 @@ export class ClaudeFileParser {
 
   getState(): ClaudeParserState {
     return { ...this.state };
+  }
+
+  /**
+   * バイトのままの1行を処理する（取り込みの通常経路）。feed と同じ結果になるが、
+   * 使わない行は文字に変換せず、利用者の行は先頭（promptId）と末尾（timestamp・sessionId）だけを変換する。
+   * 利用者の行は本文（ツール結果など）が大きく、全体の変換が取り込み時間の大半を占めていたため。
+   */
+  feedBytes(buf: Buffer, offset: number, out: ParseOutput): void {
+    if (buf.length === 0) return;
+    const ti = buf.indexOf(TYPE_KEY);
+    if (ti >= 0 && ti < 4000 && buf.subarray(ti + TYPE_KEY.length, ti + TYPE_KEY.length + 5).equals(USER_TAIL)) {
+      if (buf.indexOf(PROMPT_KEY) < 0) return;
+      const mi = buf.indexOf(MESSAGE_KEY);
+      const headEnd = mi > 0 ? mi : Math.min(buf.length, 4000);
+      if (buf.length <= headEnd + USER_TAIL_BYTES) {
+        this.handleUserLine(buf.toString('utf8'), out);
+        return;
+      }
+      const tail = buf.toString('utf8', buf.length - USER_TAIL_BYTES);
+      // 想定と違う並びの行は、全体を変換して従来どおり処理する
+      if (!tail.includes('"sessionId":"') || !tail.includes('"timestamp":"')) {
+        this.handleUserLine(buf.toString('utf8'), out);
+        return;
+      }
+      this.handleUserLine(buf.toString('utf8', 0, headEnd) + '\n' + tail, out);
+      return;
+    }
+    if (buf.indexOf(USAGE_KEY) < 0 || buf.indexOf(ASSISTANT_KEY) < 0) return;
+    this.feed(buf.toString('utf8'), offset, out);
   }
 
   /** 1行を処理する。offset はファイル内のバイト位置（行の先頭）。 */

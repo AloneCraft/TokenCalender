@@ -175,6 +175,18 @@ export class CodexFileParser {
     return structuredClone(this.state);
   }
 
+  /** バイトのままの1行を処理する（取り込みの通常経路）。使わない行は文字に変換しない。結果は feed と同じ。 */
+  feedBytes(buf: Buffer, offset: number, out: ParseOutput): void {
+    if (buf.length === 0) return;
+    const head = buf.toString('utf8', 0, Math.min(240, buf.length));
+    const type = HEAD_TYPE_RE.exec(head)?.[1];
+    if (!type || !RELEVANT.has(type) || (type === 'event_msg' && !RELEVANT_EVENT_MSG.test(head))) {
+      this.state.lineIndex++;
+      return;
+    }
+    this.feed(buf.toString('utf8'), offset, out);
+  }
+
   feed(line: string, offset: number, out: ParseOutput): void {
     if (line.length === 0) return;
     this.state.lineIndex++;

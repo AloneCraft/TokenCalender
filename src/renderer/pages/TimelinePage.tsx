@@ -4,7 +4,7 @@ import { commonFilter, useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { Seg } from '../components/Seg.tsx';
 import { TimelineChart } from '../components/TimelineChart.tsx';
-import { fmtMeasure, fmtTokens } from '../format.ts';
+import { fmtMeasure, fmtTokens, windowKeyLabel } from '../format.ts';
 import type { Measure, TimelineGranularity, TimelineResponse } from '../../shared/api.ts';
 
 type Kind = 'days' | 'five_hour' | 'calendar_week';
@@ -97,15 +97,15 @@ export function TimelinePage() {
             </label>
           )}
         </div>
-        {provider === 'both' && <div className="note" style={{ marginTop: 8 }}>{t('cal.cumulativeNeedsWindow')}（両方を選ぶと、リセット周期の違う枠を合算しないため累積を出しません）</div>}
-        {kind === 'calendar_week' && <div className="faint" style={{ marginTop: 6 }}>暦週はサブスクの週制限周期の代わりではありません。累積は選んだ枠の実際のリセットで区切ります。</div>}
+        {provider === 'both' && <div className="note" style={{ marginTop: 8 }}>{t('cal.cumulativeNeedsWindow')} {t('tl.bothNote')}</div>}
+        {kind === 'calendar_week' && <div className="faint" style={{ marginTop: 6 }}>{t('tl.weekNote')}</div>}
       </div>
       {error && <div className="note warn">{error}</div>}
       {data && (
         <div className="card">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2>
-              {kind === 'five_hour' ? (data.fiveHourBasis === 'official' ? t('tl.official5h') : t('tl.analytic5h')) : (data.windowLabel ?? t('tl.bars'))}
+              {kind === 'five_hour' ? (data.fiveHourBasis === 'official' ? t('tl.official5h') : t('tl.analytic5h')) : (data.windowLabel ? (windowKeyLabel(wWeek) ?? data.windowLabel) : t('tl.bars'))}
             </h2>
             <span className="faint">
               {t('tl.periodTotal')}: <span className="num">{fmtMeasure(data.periodTotal, data.measure, money, false)}</span>
@@ -115,8 +115,8 @@ export function TimelinePage() {
           {kind === 'five_hour' && provider !== 'both' && quota?.noFiveHour[provider] && <div className="note">{t('quota.noFiveHour')}</div>}
           <TimelineChart data={data} measure={data.measure} mode="cumulative" />
           <div className="legend">
-            <span>実線の縦線: 公式に観測したリセット</span>
-            <span>破線の縦線・斜線: 推定周期（観測の無い期間を枠の長さで延長）</span>
+            <span>{t('tl.legendObserved')}</span>
+            <span>{t('tl.legendEstimated')}</span>
           </div>
         </div>
       )}

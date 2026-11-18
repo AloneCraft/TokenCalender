@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
-import { fmtDateTime } from '../format.ts';
+import { fmtDateTime, windowName } from '../format.ts';
 
 type Row = Awaited<ReturnType<ReturnType<typeof api>['listManualObservations']>>[number];
 
@@ -32,12 +32,12 @@ export function ManualEntry() {
   const submit = async () => {
     const u = Number(used);
     if (used.trim() === '' || !Number.isFinite(u) || u < 0 || u > 100) {
-      setError('利用率は 0〜100 の数で入力してください');
+      setError(t('manual.err.used'));
       return;
     }
     const obs = Date.parse(observed);
     if (!Number.isFinite(obs)) {
-      setError('確認した日時を入力してください');
+      setError(t('manual.err.observed'));
       return;
     }
     const r = resets ? Date.parse(resets) : null;
@@ -51,7 +51,7 @@ export function ManualEntry() {
       observedAtMs: obs,
       note: note || null,
     });
-    if (!res.ok) setError(res.message ?? '記録できませんでした');
+    if (!res.ok) setError(res.message ?? t('manual.err.failed'));
     else {
       setError(null);
       setUsed('');
@@ -64,7 +64,7 @@ export function ManualEntry() {
     <div className="card">
       <h2>{t('manual.title')}</h2>
       <div className="faint" style={{ marginBottom: 8 }}>
-        「手動記録」として保存し、自動取得した値とは区別します。
+        {t('manual.lead')}
       </div>
       <div className="form-grid">
         <label htmlFor="m-p">{t('manual.provider')}</label>
@@ -74,8 +74,8 @@ export function ManualEntry() {
         </select>
         <label htmlFor="m-w">{t('manual.window')}</label>
         <select id="m-w" value={windowMinutes} onChange={(e) => setWindowMinutes(Number(e.target.value) as 300 | 10080)}>
-          <option value={10080}>週枠</option>
-          <option value={300}>5時間枠</option>
+          <option value={10080}>{windowName(10080)}</option>
+          <option value={300}>{windowName(300)}</option>
         </select>
         <label htmlFor="m-u">{t('manual.used')}</label>
         <input id="m-u" inputMode="decimal" value={used} onChange={(e) => setUsed(e.target.value)} placeholder="35" />
@@ -100,7 +100,7 @@ export function ManualEntry() {
             {rows.slice(0, 20).map((r) => (
               <tr key={r.id}>
                 <td>
-                  {r.provider} {r.windowMinutes === 300 ? '5h' : '週'}
+                  {r.provider} {windowName(r.windowMinutes)}
                 </td>
                 <td className="r">{r.usedPercent}%</td>
                 <td>{fmtDateTime(r.observedAtMs, zone)}</td>

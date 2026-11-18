@@ -1,4 +1,5 @@
 // 数値・金額・日時の表示。金額は nano-dollar の整数で受け取り、表示の直前で通貨へ直す。
+// 表示言語は App が setFormatLang で設定する（画面全体で1つ）。
 
 import type { Currency, Measure } from '../shared/api.ts';
 
@@ -7,12 +8,31 @@ export interface MoneyCtx {
   usdJpy: number;
 }
 
-const compactJa = new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1 });
-const intJa = new Intl.NumberFormat('ja-JP');
+type Lang = 'ja' | 'en';
+let LANG: Lang = 'ja';
+let compactFmt = new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1 });
+let intFmt = new Intl.NumberFormat('ja-JP');
+
+export function setFormatLang(lang: Lang): void {
+  if (lang === LANG) return;
+  LANG = lang;
+  const loc = lang === 'ja' ? 'ja-JP' : 'en-US';
+  compactFmt = new Intl.NumberFormat(loc, { notation: 'compact', maximumFractionDigits: 1 });
+  intFmt = new Intl.NumberFormat(loc);
+}
+
+export function formatLocale(): string {
+  return LANG === 'ja' ? 'ja-JP' : 'en-US';
+}
 
 export function fmtTokens(n: number, compact = true): string {
   if (!Number.isFinite(n)) return '—';
-  return compact ? compactJa.format(n) : intJa.format(Math.round(n));
+  return compact ? compactFmt.format(n) : intFmt.format(Math.round(n));
+}
+
+export function fmtInt(n: number): string {
+  if (!Number.isFinite(n)) return '—';
+  return intFmt.format(Math.round(n));
 }
 
 export function fmtMoney(nano: number, m: MoneyCtx, compact = false): string {
@@ -20,15 +40,15 @@ export function fmtMoney(nano: number, m: MoneyCtx, compact = false): string {
   const usd = nano / 1e9;
   if (m.currency === 'JPY') {
     const yen = usd * m.usdJpy;
-    return compact && Math.abs(yen) >= 10000 ? `¥${compactJa.format(yen)}` : `¥${intJa.format(Math.round(yen))}`;
+    return compact && Math.abs(yen) >= 10000 ? `¥${compactFmt.format(yen)}` : `¥${intFmt.format(Math.round(yen))}`;
   }
-  if (compact && Math.abs(usd) >= 10000) return `$${compactJa.format(usd)}`;
+  if (compact && Math.abs(usd) >= 10000) return `$${compactFmt.format(usd)}`;
   return `$${usd.toLocaleString('en-US', { minimumFractionDigits: usd < 100 ? 2 : 0, maximumFractionDigits: usd < 100 ? 2 : 0 })}`;
 }
 
 export function fmtMeasure(v: number, measure: Measure, m: MoneyCtx, compact = true): string {
   if (measure === 'cost') return fmtMoney(v, m, compact);
-  if (measure === 'events') return intJa.format(v);
+  if (measure === 'events') return intFmt.format(v);
   return fmtTokens(v, compact);
 }
 
@@ -46,12 +66,23 @@ export function fmtPct(v: number | null, digits = 0): string {
 
 export function fmtDateTime(ms: number | null, zone: string): string {
   if (ms == null) return '—';
-  return new Date(ms).toLocaleString('ja-JP', { timeZone: zone, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleString(formatLocale(), { timeZone: zone, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** 曜日つきの日時（例: 11/22(日) 23:54） */
+export function fmtDateTimeWd(ms: number | null, zone: string): string {
+  if (ms == null) return '—';
+  return new Date(ms).toLocaleString(formatLocale(), { timeZone: zone, month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+export function fmtDate(ms: number | null, zone: string): string {
+  if (ms == null) return '—';
+  return new Date(ms).toLocaleDateString(formatLocale(), { timeZone: zone, month: 'numeric', day: 'numeric', weekday: 'short' });
 }
 
 export function fmtTime(ms: number | null, zone: string): string {
   if (ms == null) return '—';
-  return new Date(ms).toLocaleTimeString('ja-JP', { timeZone: zone, hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString(formatLocale(), { timeZone: zone, hour: '2-digit', minute: '2-digit' });
 }
 
 export function fmtDuration(ms: number | null): string {
@@ -63,25 +94,46 @@ export function fmtDuration(ms: number | null): string {
   const h = Math.floor(s / 3600);
   s -= h * 3600;
   const m = Math.floor(s / 60);
-  const str = d > 0 ? `${d}日${h}時間` : h > 0 ? `${h}時間${m}分` : m > 0 ? `${m}分` : `${s}秒`;
+  const ja = LANG === 'ja';
+  const str =
+    d > 0 ? (ja ? `${d}日${h}時間` : `${d}d ${h}h`) : h > 0 ? (ja ? `${h}時間${m}分` : `${h}h ${m}m`) : m > 0 ? (ja ? `${m}分` : `${m}m`) : ja ? `${s}秒` : `${s}s`;
   return neg ? `-${str}` : str;
 }
 
 export function fmtAgo(ms: number | null, now = Date.now()): string {
   if (ms == null) return '—';
   // ログの時刻が端末の時計よりわずかに先のことがある。負の値は「たった今」とする
-  if (now - ms < 1000) return 'たった今';
-  return `${fmtDuration(now - ms)}前`;
+  if (now - ms < 1000) return LANG === 'ja' ? 'たった今' : 'just now';
+  return LANG === 'ja' ? `${fmtDuration(now - ms)}前` : `${fmtDuration(now - ms)} ago`;
 }
 
 /** 枠の長さの表示名（300 → 5時間枠、10080 → 週枠、43200 → 30日枠） */
 export function windowName(minutes: number | null): string {
-  if (minutes == null || minutes <= 0) return '期間不明の枠';
-  if (minutes === 300) return '5時間枠';
-  if (minutes === 10080) return '週枠';
-  if (minutes % 1440 === 0) return `${minutes / 1440}日枠`;
-  if (minutes % 60 === 0) return `${minutes / 60}時間枠`;
-  return `${minutes}分枠`;
+  const ja = LANG === 'ja';
+  if (minutes == null || minutes <= 0) return ja ? '期間不明の枠' : 'Window (unknown length)';
+  if (minutes === 300) return ja ? '5時間枠' : '5-hour window';
+  if (minutes === 10080) return ja ? '週枠' : 'Weekly window';
+  if (minutes % 1440 === 0) return ja ? `${minutes / 1440}日枠` : `${minutes / 1440}-day window`;
+  if (minutes % 60 === 0) return ja ? `${minutes / 60}時間枠` : `${minutes / 60}-hour window`;
+  return ja ? `${minutes}分枠` : `${minutes}-minute window`;
+}
+
+/** 枠の鍵（provider|account|limit|minutes|scope）から表示名を作る */
+export function windowKeyLabel(key: string | null): string | null {
+  if (!key) return null;
+  const [provider, , limitId, minutes] = key.split('|');
+  const p = provider === 'claude' ? 'Claude' : provider === 'codex' ? 'Codex' : (provider ?? '');
+  const m = minutes && minutes !== 'x' ? Number(minutes) : null;
+  return `${p} ${windowName(m)}${limitId && limitId !== provider ? ` (${limitId})` : ''}`;
+}
+
+/** 「モデル|エフォート」を表示用に整える */
+export function groupLabel(group: string | null): string {
+  if (!group) return '—';
+  const i = group.lastIndexOf('|');
+  if (i < 0) return group;
+  const effort = group.slice(i + 1);
+  return effort === 'unknown' ? group.slice(0, i) : `${group.slice(0, i)} / ${effort}`;
 }
 
 export function localZone(): string {

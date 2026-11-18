@@ -38,7 +38,7 @@ export function AnalysisPage() {
 
   }, [chartId, from, to, step, filters, dataVersion, zone, app.settings.pricingMode]);
 
-  const option = useMemo(() => (data ? def.build(data, { measure: data.measure, zone, fmt: (v) => fmtMeasure(v, data.measure, money) }) : null), [data, def, zone, money]);
+  const option = useMemo(() => (data ? def.build(data, { measure: data.measure, zone, fmt: (v) => fmtMeasure(v, data.measure, money), t }) : null), [data, def, zone, money, t]);
 
   const exportCsv = () => {
     if (!data) return;
@@ -80,7 +80,7 @@ export function AnalysisPage() {
               <select value={step} onChange={(e) => setStep(Number(e.target.value))}>
                 {[15, 60, 300, 1440, 10080].map((s) => (
                   <option key={s} value={s}>
-                    {s >= 1440 ? `${s / 1440}日` : s >= 60 ? `${s / 60}時間` : `${s}分`}
+                    {s >= 1440 ? t('ui.days', { n: s / 1440 }) : s >= 60 ? t('ui.hours', { n: s / 60 }) : t('ui.minutes', { n: s })}
                   </option>
                 ))}
               </select>

@@ -45,8 +45,8 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
         </h2>
         <span className="row">
           <select aria-label="step" value={step} onChange={(e) => setStep(Number(e.target.value) as 15 | 60)}>
-            <option value={60}>60分</option>
-            <option value={15}>15分</option>
+            <option value={60}>{t('ui.minutes', { n: 60 })}</option>
+            <option value={15}>{t('ui.minutes', { n: 15 })}</option>
           </select>
           <button className="btn" onClick={onClose}>
             {t('detail.close')}
@@ -69,8 +69,8 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
             )}
           </div>
           <div className="faint">
-            {t('measure.input')} {fmtTokens(d.totals.input)} ・ {t('measure.cache_read')} {fmtTokens(d.totals.cacheRead)} ・ {t('measure.cache_write')} {fmtTokens(d.totals.cacheWrite)} ・ {t('measure.output')}{' '}
-            {fmtTokens(d.totals.output)}（{t('measure.reasoning')} {fmtTokens(d.totals.reasoning)}）
+            {t('measure.input')} {fmtTokens(d.totals.input)} · {t('measure.cache_read')} {fmtTokens(d.totals.cacheRead)} · {t('measure.cache_write')} {fmtTokens(d.totals.cacheWrite)} · {t('measure.output')}{' '}
+            {fmtTokens(d.totals.output)} ({t('measure.reasoning')} {fmtTokens(d.totals.reasoning)})
           </div>
           {d.cycles.length > 0 && (
             <>
@@ -78,8 +78,8 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>周期</th>
-                    <th className="r">トークン</th>
+                    <th>{t('detail.cycle')}</th>
+                    <th className="r">{t('detail.tokens')}</th>
                     <th className="r">{t('measure.cost')}</th>
                   </tr>
                 </thead>
@@ -87,7 +87,7 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
                   {d.cycles.map((c) => (
                     <tr key={c.startMs}>
                       <td>
-                        {fmtDateTime(c.startMs, zone)} 〜 {fmtDateTime(c.endMs, zone)} {c.estimated && <span className="badge est">推定周期</span>}
+                        {fmtDateTime(c.startMs, zone)} 〜 {fmtDateTime(c.endMs, zone)} {c.estimated && <span className="badge est">{t('reason.estimated_cycle')}</span>}
                       </td>
                       <td className="r">{fmtTokens(c.tokensInDay, false)}</td>
                       <td className="r">{fmtMoney(c.usageInDay, money)}</td>
@@ -115,12 +115,12 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
           <table className="tbl">
             <thead>
               <tr>
-                <th>時刻</th>
-                <th>プロジェクト</th>
-                <th>モデル</th>
-                <th className="r">トークン</th>
+                <th>{t('detail.time')}</th>
+                <th>{t('detail.project')}</th>
+                <th>{t('detail.model')}</th>
+                <th className="r">{t('detail.tokens')}</th>
                 <th className="r">{t('measure.cost')}</th>
-                <th className="r">要求</th>
+                <th className="r">{t('detail.requests')}</th>
               </tr>
             </thead>
             <tbody>

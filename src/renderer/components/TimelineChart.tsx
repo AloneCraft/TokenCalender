@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { EChart, type EChartsOption } from './EChart.tsx';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
-import { colorFor, fmtMeasure } from '../format.ts';
+import { colorFor, fmtMeasure, formatLocale } from '../format.ts';
 import type { Measure, TimelineBucket, TimelineResponse } from '../../shared/api.ts';
 
 /** 上段: 区間ごとの棒、下段: 周期内累積（リセットで 0 に戻る）。同じ横軸を共有する。 */
@@ -21,7 +21,7 @@ export function TimelineChart({
   const t = useT();
   const option = useMemo<EChartsOption>(() => {
     const labels = data.buckets.map((b) =>
-      new Date(b.startMs).toLocaleString('ja-JP', { timeZone: zone, month: 'numeric', day: 'numeric', ...(b.endMs - b.startMs < 86400000 ? { hour: '2-digit' } : {}) }),
+      new Date(b.startMs).toLocaleString(formatLocale(), { timeZone: zone, month: 'numeric', day: 'numeric', ...(b.endMs - b.startMs < 86400000 ? { hour: '2-digit' } : {}) }),
     );
     const fmt = (v: number) => fmtMeasure(v, measure, money);
     const keys = data.dimensionKeys.length ? data.dimensionKeys : ['all'];
@@ -37,7 +37,7 @@ export function TimelineChart({
     const cum = data.buckets.map((b) => b.cumulative);
     const resetLines = data.resets.map((r) => {
       const idx = data.buckets.findIndex((b) => r.atMs >= b.startMs && r.atMs < b.endMs);
-      return { xAxis: idx, lineStyle: { type: r.estimated ? 'dashed' : 'solid', color: r.estimated ? '#999' : '#d9534f' }, label: { formatter: r.estimated ? '推定リセット' : 'リセット', fontSize: 10 } };
+      return { xAxis: idx, lineStyle: { type: r.estimated ? 'dashed' : 'solid', color: r.estimated ? '#999' : '#d9534f' }, label: { formatter: r.estimated ? t('cal.resetEstimated') : t('tl.reset'), fontSize: 10 } };
     });
     const series: unknown[] = [...bars];
     const showCum = mode === 'cumulative' || cum.some((c) => c.cycleKnown);

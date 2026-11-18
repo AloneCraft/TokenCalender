@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.ts';
 import { Ctx, defaultWindow, type AppCtx, type Filters } from './state.ts';
-import { LangContext, translate } from './i18n/index.ts';
-import { localZone } from './format.ts';
+import { LangContext, resolveLang, translate } from './i18n/index.ts';
+import { localZone, setFormatLang } from './format.ts';
 import { DEFAULT_SETTINGS, type AppStatus, type IngestStatus, type QuotaOverview, type Settings } from '../shared/api.ts';
 import { Toolbar } from './components/Toolbar.tsx';
 import { CalendarPage } from './pages/CalendarPage.tsx';
@@ -11,10 +11,14 @@ import { AnalysisPage } from './pages/AnalysisPage.tsx';
 import { EstimatePage } from './pages/EstimatePage.tsx';
 import { SourcesPage } from './pages/SourcesPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
+import { DashboardPage } from './pages/DashboardPage.tsx';
+import { RatesPage } from './pages/RatesPage.tsx';
 
-type Page = 'calendar' | 'timeline' | 'analysis' | 'estimate' | 'sources' | 'settings';
+export type Page = 'dashboard' | 'calendar' | 'timeline' | 'rates' | 'analysis' | 'estimate' | 'sources' | 'settings';
 
 const NAV: { id: Page; ico: string }[] = [
+  { id: 'dashboard', ico: '◉' },
+  { id: 'rates', ico: '⚖' },
   { id: 'calendar', ico: '▦' },
   { id: 'timeline', ico: '▥' },
   { id: 'analysis', ico: '◔' },
@@ -25,7 +29,7 @@ const NAV: { id: Page; ico: string }[] = [
 
 export function App() {
   const now = new Date();
-  const [page, setPage] = useState<Page>('calendar');
+  const [page, setPage] = useState<Page>('dashboard');
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [quota, setQuota] = useState<QuotaOverview | null>(null);
@@ -110,7 +114,7 @@ export function App() {
     const root = document.documentElement;
     if (settings.theme === 'system') delete root.dataset.theme;
     else root.dataset.theme = settings.theme;
-    root.lang = settings.language;
+    root.lang = resolveLang(settings.language);
   }, [settings.theme, settings.language]);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
@@ -124,11 +128,14 @@ export function App() {
     () => ({ settings, zone, money: { currency: settings.currency, usdJpy: settings.usdJpy }, filters, setFilters, status, quota, dataVersion, slowVersion, updateSettings }),
     [settings, zone, filters, setFilters, status, quota, dataVersion, slowVersion, updateSettings],
   );
-  const t = (k: string) => translate(settings.language, k);
+  const lang = resolveLang(settings.language);
+  // 書式（日時・期間）の言語は描画の前にそろえる
+  setFormatLang(lang);
+  const t = (k: string) => translate(lang, k);
   const scanning = progress && progress.phase === 'scanning' && progress.filesTotal > 0;
 
   return (
-    <LangContext.Provider value={settings.language}>
+    <LangContext.Provider value={lang}>
       <Ctx.Provider value={ctx}>
         <div className="app">
           <nav className="nav" aria-label="main">
@@ -149,12 +156,14 @@ export function App() {
             )}
             {scanning && (
               <div className="banner progress" role="status">
-                {t('src.progress')}: {progress.filesDone.toLocaleString()} / {progress.filesTotal.toLocaleString()}（
-                {Math.round((progress.bytesDone / Math.max(1, progress.bytesTotal)) * 100)}%）
+                {t('src.progress')}: {progress.filesDone.toLocaleString()} / {progress.filesTotal.toLocaleString()} (
+                {Math.round((progress.bytesDone / Math.max(1, progress.bytesTotal)) * 100)}%)
               </div>
             )}
             {(page === 'calendar' || page === 'timeline' || page === 'analysis') && <Toolbar page={page} />}
             <div className="page">
+              {page === 'dashboard' && <DashboardPage onNavigate={setPage} />}
+              {page === 'rates' && <RatesPage />}
               {page === 'calendar' && <CalendarPage onOpenEstimate={() => setPage('estimate')} />}
               {page === 'timeline' && <TimelinePage />}
               {page === 'analysis' && <AnalysisPage />}
