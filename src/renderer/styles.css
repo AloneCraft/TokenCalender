@@ -159,3 +159,24 @@ table.tbl td.r, table.tbl th.r { text-align: right; font-variant-numeric: tabula
 .form-grid { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 8px 12px; align-items: center; }
 pre.code { background: var(--surface-2); border-radius: 6px; padding: 8px; font-size: 11px; overflow: auto; max-height: 160px; white-space: pre-wrap; word-break: break-all; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 表示言語の選択欄 */
+.lang-picker { position: relative; display: inline-block; }
+.lang-button { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px 8px; color: var(--text); min-width: 220px; text-align: left; }
+.lang-button .lang-current { flex: 1; }
+.lang-caret { color: var(--text-3); font-size: 11px; }
+.flag { display: inline-block; flex: none; border-radius: 2px; vertical-align: middle; }
+.lang-list { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 100%; margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); max-height: 320px; overflow-y: auto; }
+.lang-list:focus { outline: none; }
+.lang-option { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.lang-option.active { background: var(--accent-bg); }
+.lang-option.system { border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; margin-bottom: 2px; }
+.lang-option .faint { font-size: 11px; }
+.lang-check { margin-left: auto; color: var(--accent); }
+/* 案内帯の下に置く小さい形。一覧は右上へ開く */
+.nav .lang-picker { margin-top: auto; align-self: center; }
+.nav .lang-picker .lang-button { flex-direction: row; min-width: 0; padding: 4px 6px; gap: 4px; font-size: 11px; background: none; border-color: var(--border); color: var(--text-2); }
+.lang-picker.compact .lang-list { top: auto; bottom: 0; left: calc(100% + 6px); min-width: 220px; }
+.lang-code { font-weight: 600; letter-spacing: 0.02em; }
+/* 韓国語の書体（ハングルは日本語用の書体に無いため、韓国語のときは韓国語用の書体を先に使う） */
+:root:lang(ko) { --font: 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', system-ui, sans-serif; }

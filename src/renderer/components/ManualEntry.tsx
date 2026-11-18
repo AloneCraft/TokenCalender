@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
-import { useT } from '../i18n/index.ts';
+import { useMsg, useT } from '../i18n/index.ts';
 import { fmtDateTime, windowName } from '../format.ts';
 
 type Row = Awaited<ReturnType<ReturnType<typeof api>['listManualObservations']>>[number];
@@ -15,6 +15,7 @@ function toLocalInput(ms: number): string {
 export function ManualEntry() {
   const { zone, dataVersion } = useApp();
   const t = useT();
+  const tMsg = useMsg();
   const [rows, setRows] = useState<Row[]>([]);
   const [provider, setProvider] = useState<'claude' | 'codex'>('claude');
   const [windowMinutes, setWindowMinutes] = useState<300 | 10080>(10080);
@@ -51,7 +52,7 @@ export function ManualEntry() {
       observedAtMs: obs,
       note: note || null,
     });
-    if (!res.ok) setError(res.message ?? t('manual.err.failed'));
+    if (!res.ok) setError(res.message ? tMsg(res.message) : t('manual.err.failed'));
     else {
       setError(null);
       setUsed('');

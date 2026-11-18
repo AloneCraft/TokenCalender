@@ -8,22 +8,27 @@ export interface MoneyCtx {
   usdJpy: number;
 }
 
-type Lang = 'ja' | 'en';
-let LANG: Lang = 'ja';
-let compactFmt = new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1 });
-let intFmt = new Intl.NumberFormat('ja-JP');
+import { languageOf, translate, type LangCode } from '../shared/i18n/languages.ts';
 
-export function setFormatLang(lang: Lang): void {
+let LANG: LangCode = 'ja';
+let LOCALE = 'ja-JP';
+let compactFmt = new Intl.NumberFormat(LOCALE, { notation: 'compact', maximumFractionDigits: 1 });
+let intFmt = new Intl.NumberFormat(LOCALE);
+
+export function setFormatLang(lang: LangCode): void {
   if (lang === LANG) return;
   LANG = lang;
-  const loc = lang === 'ja' ? 'ja-JP' : 'en-US';
-  compactFmt = new Intl.NumberFormat(loc, { notation: 'compact', maximumFractionDigits: 1 });
-  intFmt = new Intl.NumberFormat(loc);
+  // 数字・日付の書き方は、言語の登録表にある地域つきのタグで決める
+  LOCALE = languageOf(lang).locale;
+  compactFmt = new Intl.NumberFormat(LOCALE, { notation: 'compact', maximumFractionDigits: 1 });
+  intFmt = new Intl.NumberFormat(LOCALE);
 }
 
 export function formatLocale(): string {
-  return LANG === 'ja' ? 'ja-JP' : 'en-US';
+  return LOCALE;
 }
+
+const tr = (key: string, vars?: Record<string, string | number>) => translate(LANG, key, vars);
 
 export function fmtTokens(n: number, compact = true): string {
   if (!Number.isFinite(n)) return '—';
@@ -94,28 +99,25 @@ export function fmtDuration(ms: number | null): string {
   const h = Math.floor(s / 3600);
   s -= h * 3600;
   const m = Math.floor(s / 60);
-  const ja = LANG === 'ja';
-  const str =
-    d > 0 ? (ja ? `${d}日${h}時間` : `${d}d ${h}h`) : h > 0 ? (ja ? `${h}時間${m}分` : `${h}h ${m}m`) : m > 0 ? (ja ? `${m}分` : `${m}m`) : ja ? `${s}秒` : `${s}s`;
+  const str = d > 0 ? tr('fmt.duration.dh', { d, h }) : h > 0 ? tr('fmt.duration.hm', { h, m }) : m > 0 ? tr('fmt.duration.m', { m }) : tr('fmt.duration.s', { s });
   return neg ? `-${str}` : str;
 }
 
 export function fmtAgo(ms: number | null, now = Date.now()): string {
   if (ms == null) return '—';
   // ログの時刻が端末の時計よりわずかに先のことがある。負の値は「たった今」とする
-  if (now - ms < 1000) return LANG === 'ja' ? 'たった今' : 'just now';
-  return LANG === 'ja' ? `${fmtDuration(now - ms)}前` : `${fmtDuration(now - ms)} ago`;
+  if (now - ms < 1000) return tr('fmt.justNow');
+  return tr('fmt.ago', { d: fmtDuration(now - ms) });
 }
 
 /** 枠の長さの表示名（300 → 5時間枠、10080 → 週枠、43200 → 30日枠） */
 export function windowName(minutes: number | null): string {
-  const ja = LANG === 'ja';
-  if (minutes == null || minutes <= 0) return ja ? '期間不明の枠' : 'Window (unknown length)';
-  if (minutes === 300) return ja ? '5時間枠' : '5-hour window';
-  if (minutes === 10080) return ja ? '週枠' : 'Weekly window';
-  if (minutes % 1440 === 0) return ja ? `${minutes / 1440}日枠` : `${minutes / 1440}-day window`;
-  if (minutes % 60 === 0) return ja ? `${minutes / 60}時間枠` : `${minutes / 60}-hour window`;
-  return ja ? `${minutes}分枠` : `${minutes}-minute window`;
+  if (minutes == null || minutes <= 0) return tr('win.unknown');
+  if (minutes === 300) return tr('win.fiveHour');
+  if (minutes === 10080) return tr('win.weekly');
+  if (minutes % 1440 === 0) return tr('win.days', { n: minutes / 1440 });
+  if (minutes % 60 === 0) return tr('win.hours', { n: minutes / 60 });
+  return tr('win.minutes', { n: minutes });
 }
 
 /** 枠の鍵（provider|account|limit|minutes|scope）から表示名を作る */

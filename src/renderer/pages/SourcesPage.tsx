@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
-import { useT } from '../i18n/index.ts';
+import { useMsg, useT } from '../i18n/index.ts';
 import { fmtAgo } from '../format.ts';
 import type { BillingMode, BridgePreview, IngestStatus } from '../../shared/api.ts';
 
@@ -10,6 +10,7 @@ const STATUS_BADGE: Record<string, string> = { ok: 'ok', missing: '', permission
 export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
   const { status, quota } = useApp();
   const t = useT();
+  const tMsg = useMsg();
   const [msg, setMsg] = useState<string | null>(null);
   const [wsl, setWsl] = useState<{ distro: string; provider: 'claude' | 'codex'; path: string }[] | null>(null);
   const [preview, setPreview] = useState<BridgePreview | null>(null);
@@ -20,7 +21,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
     const p = await api().pickFolder();
     if (!p) return;
     const r = await api().addSource({ provider, path: p });
-    setMsg(r.ok ? t('src.added', { p }) : t('src.addFailed', { m: r.message ?? '' }));
+    setMsg(r.ok ? t('src.added', { p }) : t('src.addFailed', { m: tMsg(r.message) }));
   };
 
   return (
@@ -81,7 +82,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                 <td>
                   <span className={`badge ${STATUS_BADGE[s.status] ?? ''}`}>{t(`src.status.${s.status}`)}</span>
                   {s.detail && <div className="faint">{s.detail}</div>}
-                  {s.filesWithErrors > 0 && <div className="faint">{t('src.unreadable', { n: s.filesWithErrors })}</div>}
+                  {s.filesWithErrors > 0 && <div className="faint">{t('src.unreadable', { count: s.filesWithErrors })}</div>}
                   {s.badLines > 0 && (
                     <div className="faint">
                       {t('src.badLines')} {s.badLines}
@@ -181,7 +182,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                 void api()
                   .bridgeInstall()
                   .then((r) => {
-                    setMsg(r.ok ? t('bridge.enabled', { b: r.message ?? t('bridge.noBackup') }) : t('bridge.unchanged', { m: r.message ?? '' }));
+                    setMsg(r.ok ? t('bridge.enabled', { b: r.message ?? t('bridge.noBackup') }) : t('bridge.unchanged', { m: tMsg(r.message) }));
                     return api().bridgePreview().then(setPreview);
                   })
               }
@@ -196,7 +197,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                 void api()
                   .bridgeUninstall()
                   .then((r) => {
-                    setMsg(r.ok ? t('bridge.restored') : t('bridge.unchanged', { m: r.message ?? '' }));
+                    setMsg(r.ok ? t('bridge.restored') : t('bridge.unchanged', { m: tMsg(r.message) }));
                     return api().bridgePreview().then(setPreview);
                   })
               }
@@ -215,7 +216,7 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
             <div className="faint">{t('bridge.script', { p: preview.scriptPath })}</div>
             <div className="faint">{t('bridge.output', { p: preview.outputPath })}</div>
             <div className="note" style={{ marginTop: 6 }}>
-              {preview.note}
+              {t(preview.note)}
             </div>
           </div>
         )}

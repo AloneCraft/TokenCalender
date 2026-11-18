@@ -253,7 +253,6 @@ export const ja = {
   'dash.out.borderline': 'リセット前後で上限に達する可能性があります（持つ確率 {p}%、リセット時に {pct} 残る見込み）。',
   'dash.out.keepPace': 'リセットまで持たせるには、1日あたり約 {pct}% までに抑える必要があります。',
   'dash.out.keepPace.turns': 'リセットまで持たせるには、1日あたり約 {pct}%（{group} なら1日 約 {n} 回）までに抑える必要があります。',
-  'set.language.system': 'OS の言語に合わせる',
   'set.plan': '利用枠の計画',
   'set.reserve': 'リセット時に残しておく量（%）',
   'set.reserve.note': '安全重視なら 10%、バランスなら 5%、最大活用なら 0〜2% が目安です。',
@@ -476,7 +475,7 @@ export const ja = {
   'src.progressLine': '{phase} · {done} / {total} ファイル · 追加 {ins} 件 · 更新 {upd} 件 · エラー {err}',
   'src.col.source': 'データ元',
   'src.col.status': '状態',
-  'src.unreadable': '読めないファイル {n}',
+  'src.unreadable': '読めないファイル {count}',
   'src.scanned': '走査 {ago}',
   'src.accountNote': 'ログに根拠が無い利用だけに関連付けます',
   'src.notFound': '見つかりませんでした',
@@ -490,6 +489,53 @@ export const ja = {
   'bridge.none': 'なし',
   'bridge.script': '連携スクリプト: {p}',
   'bridge.output': '記録先（利用率とリセット時刻だけ）: {p}',
+
+  // 書式（format.ts）
+  'fmt.duration.dh': '{d}日{h}時間',
+  'fmt.duration.hm': '{h}時間{m}分',
+  'fmt.duration.m': '{m}分',
+  'fmt.duration.s': '{s}秒',
+  'fmt.justNow': 'たった今',
+  'fmt.ago': '{d}前',
+  'win.unknown': '期間不明の枠',
+  'win.fiveHour': '5時間枠',
+  'win.weekly': '週枠',
+  'win.days': '{n}日枠',
+  'win.hours': '{n}時間枠',
+  'win.minutes': '{n}分枠',
+
+  // 言語の選択
+  'lang.label': '表示言語',
+  'lang.system': 'OS に合わせる',
+  'lang.systemCurrent': 'OS に合わせる（今は {name}）',
+
+  // 本体の確認ダイアログ・書き出し
+  'dlg.cancel': 'やめる',
+  'dlg.bridgeInstall.ok': '変更する',
+  'dlg.bridgeInstall.title': 'Claude Code の設定変更',
+  'dlg.bridgeInstall.message': '{path} の statusLine を変更します。',
+  'dlg.bridgeInstall.detail': '変更前の設定はバックアップします。\n変更後: {value}',
+  'dlg.bridgeUninstall.ok': '元に戻す',
+  'dlg.bridgeUninstall.title': 'Claude Code の設定を元に戻す',
+  'dlg.bridgeUninstall.message': '{path} の statusLine を連携前の状態に戻します。',
+  'dlg.delete.ok': '削除する',
+  'dlg.delete.title': 'アプリのデータを削除',
+  'dlg.delete.message': 'このアプリが作った集計データ（DB）を削除します。元の Claude / Codex のログは削除しません。',
+  'dlg.delete.detail': '削除した後、ログからもう一度読み込みます。手動記録した利用率は元に戻せません。',
+  'export.note': 'api_cost_equivalent_usd は API 料金換算の参考額であり、実際の請求額ではありません',
+
+  // 処理の結果（本体・問い合わせスレッドが返す記号を、表示の直前で訳す）
+  'msg.cancelled': 'やめました',
+  'msg.not_found': '見つかりません',
+  'msg.invalid_file': 'ファイルの形式を読み取れません',
+  'msg.not_events_export': 'イベントの書き出しファイルではありません',
+  'msg.duplicate': '同じ記録がすでにあります',
+  'msg.settings_invalid': 'settings.json の形式を解釈できません',
+  'msg.settings_unreadable': 'settings.json を読めません',
+  'msg.not_ours': '現在のステータスライン設定は本アプリのものではないため、変更しませんでした。',
+  'msg.original_unreadable': '保存していた元の設定を読めません。バックアップから手動で戻してください。',
+  'bridge.note.coexist': '既存のステータスライン表示は保存し、連携スクリプトから呼び出して共存させます（Windows では cmd.exe 経由。動作は未検証）。',
+  'bridge.note.desktopUnverified': 'Claude Code のデスクトップ版でステータスラインが動作するかは未確認です。動作しない場合は手動記録を使ってください。',
 } as const;
 
 export type MessageKey = keyof typeof ja;

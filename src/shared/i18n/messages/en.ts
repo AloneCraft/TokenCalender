@@ -1,7 +1,7 @@
-import type { MessageKey } from './ja.ts';
+import type { Messages } from '../languages.ts';
 
 // 英語の文言。すべての鍵を必須にして、訳し漏れを型検査で見つける。
-export const en: Record<MessageKey, string> = {
+export const en: Messages = {
   'nav.calendar': 'Calendar',
   'nav.timeline': 'Timeline',
   'nav.analysis': 'Analysis',
@@ -255,7 +255,6 @@ export const en: Record<MessageKey, string> = {
   'dash.out.borderline': 'You may hit the limit around the reset ({p}% chance to last; {pct} expected left at reset).',
   'dash.out.keepPace': 'To last until reset, keep usage to about {pct}% per day.',
   'dash.out.keepPace.turns': 'To last until reset, keep usage to about {pct}% per day (about {n} requests per day with {group}).',
-  'set.language.system': 'Follow OS language',
   'set.plan': 'Usage plan',
   'set.reserve': 'Amount to keep at reset (%)',
   'set.reserve.note': 'Suggested: 10% for safety, 5% for balance, 0–2% to use it all.',
@@ -478,7 +477,7 @@ export const en: Record<MessageKey, string> = {
   'src.progressLine': '{phase} · {done} / {total} files · {ins} added · {upd} updated · {err} errors',
   'src.col.source': 'Source',
   'src.col.status': 'Status',
-  'src.unreadable': '{n} unreadable files',
+  'src.unreadable': '{count} unreadable files',
   'src.scanned': 'scanned {ago}',
   'src.accountNote': 'Applied only to usage without account evidence in the logs',
   'src.notFound': 'Nothing found',
@@ -492,4 +491,51 @@ export const en: Record<MessageKey, string> = {
   'bridge.none': 'none',
   'bridge.script': 'Link script: {p}',
   'bridge.output': 'Output (usage rate and reset time only): {p}',
+
+  'fmt.duration.dh': '{d}d {h}h',
+  'fmt.duration.hm': '{h}h {m}m',
+  'fmt.duration.m': '{m}m',
+  'fmt.duration.s': '{s}s',
+  'fmt.justNow': 'just now',
+  'fmt.ago': '{d} ago',
+  'win.unknown': 'Window (unknown length)',
+  'win.fiveHour': '5-hour window',
+  'win.weekly': 'Weekly window',
+  'win.days': '{n}-day window',
+  'win.hours': '{n}-hour window',
+  'win.minutes': '{n}-minute window',
+
+  'lang.label': 'Display language',
+  'lang.system': 'Follow OS',
+  'lang.systemCurrent': 'Follow OS (now {name})',
+
+  'dlg.cancel': 'Cancel',
+  'dlg.bridgeInstall.ok': 'Change',
+  'dlg.bridgeInstall.title': 'Change Claude Code settings',
+  'dlg.bridgeInstall.message': 'The statusLine in {path} will be changed.',
+  'dlg.bridgeInstall.detail': 'The current settings will be backed up.\nAfter the change: {value}',
+  'dlg.bridgeUninstall.ok': 'Restore',
+  'dlg.bridgeUninstall.title': 'Restore Claude Code settings',
+  'dlg.bridgeUninstall.message': 'The statusLine in {path} will be restored to its state before the link.',
+  'dlg.delete.ok': 'Delete',
+  'dlg.delete.title': 'Delete app data',
+  'dlg.delete.message': "This deletes the app's own aggregated data (database). Your original Claude / Codex logs are not deleted.",
+  'dlg.delete.detail': 'After deletion, the logs are read again. Manually recorded usage rates cannot be restored.',
+  'export.note': 'api_cost_equivalent_usd is a reference API cost equivalent, not an actual bill',
+
+  'msg.cancelled': 'Cancelled',
+  'msg.not_found': 'Not found',
+  'msg.invalid_file': 'Could not read the file format',
+  'msg.not_events_export': 'This is not an events export file',
+  'msg.duplicate': 'The same record already exists',
+  'msg.settings_invalid': 'Could not interpret settings.json',
+  'msg.settings_unreadable': 'Could not read settings.json',
+  'msg.not_ours': 'The current status line setting is not from this app, so nothing was changed.',
+  'msg.original_unreadable': 'Could not read the saved original setting. Please restore it manually from the backup.',
+  'bridge.note.coexist': 'Your existing status line is saved and called from the link script so both work (via cmd.exe on Windows; not verified).',
+  'bridge.note.desktopUnverified': 'It is not verified whether the status line works in the Claude Code desktop app. If it does not, use manual entry.',
+
+  // 数で形が変わる文（translate に count を渡すと、言語の規則で .one / .other などを選ぶ）
+  'src.unreadable.one': '{count} unreadable file',
+  'src.unreadable.other': '{count} unreadable files',
 };

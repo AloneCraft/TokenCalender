@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
-import { useT } from '../i18n/index.ts';
+import { useMsg, useT } from '../i18n/index.ts';
 import { fmtDateTime, fmtInt, localZone } from '../format.ts';
 import { isValidZoneName } from '../zone.ts';
-import type { Settings } from '../../shared/api.ts';
+import { LanguagePicker } from '../components/LanguagePicker.tsx';
 
 const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 0.5, 0.5];
 
 export function SettingsPage() {
   const { settings, updateSettings, status, zone } = useApp();
   const t = useT();
+  const tMsg = useMsg();
   const [zoneDraft, setZoneDraft] = useState(settings.zone ?? '');
   const [rateDraft, setRateDraft] = useState(String(settings.usdJpy));
   const [reserveDraft, setReserveDraft] = useState(String(settings.reservePct));
@@ -63,12 +64,10 @@ export function SettingsPage() {
           </div>
         )}
         <div className="form-grid">
-          <label htmlFor="s-l">{t('set.language')}</label>
-          <select id="s-l" value={settings.language} onChange={(e) => void updateSettings({ language: e.target.value as Settings['language'] })}>
-            <option value="system">{t('set.language.system')}</option>
-            <option value="ja">日本語</option>
-            <option value="en">English</option>
-          </select>
+          <label htmlFor="s-l-button">{t('set.language')}</label>
+          <div>
+            <LanguagePicker id="s-l" value={settings.language} onChange={(v) => void updateSettings({ language: v })} />
+          </div>
           <label htmlFor="s-z">{t('set.zone')}</label>
           <span className="row">
             <input id="s-z" value={zoneDraft} placeholder={localZone()} onChange={(e) => setZoneDraft(e.target.value)} />
@@ -171,7 +170,7 @@ export function SettingsPage() {
           {t('set.exportNote')}
         </div>
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn" onClick={() => void api().importData().then((r) => setMsg(r.ok ? t('set.importDone', { inserted: r.inserted, skipped: r.skipped }) : (r.message ?? null)))}>
+          <button className="btn" onClick={() => void api().importData().then((r) => setMsg(r.ok ? t('set.importDone', { inserted: r.inserted, skipped: r.skipped }) : tMsg(r.message) || null))}>
             {t('set.import')}
           </button>
         </div>

@@ -3,6 +3,8 @@ import { api } from './api.ts';
 import { Ctx, defaultWindow, type AppCtx, type Filters } from './state.ts';
 import { LangContext, resolveLang, translate } from './i18n/index.ts';
 import { localZone, setFormatLang } from './format.ts';
+import { languageOf } from '../shared/i18n/languages.ts';
+import { LanguagePicker } from './components/LanguagePicker.tsx';
 import { DEFAULT_SETTINGS, type AppStatus, type IngestStatus, type QuotaOverview, type Settings } from '../shared/api.ts';
 import { Toolbar } from './components/Toolbar.tsx';
 import { CalendarPage } from './pages/CalendarPage.tsx';
@@ -114,7 +116,10 @@ export function App() {
     const root = document.documentElement;
     if (settings.theme === 'system') delete root.dataset.theme;
     else root.dataset.theme = settings.theme;
-    root.lang = resolveLang(settings.language);
+    const l = resolveLang(settings.language);
+    root.lang = languageOf(l).locale;
+    // 右から左に書く言語を足したときのために、文字の向きも登録表に合わせる
+    root.dir = languageOf(l).dir;
   }, [settings.theme, settings.language]);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
@@ -147,6 +152,7 @@ export function App() {
                 {t(`nav.${n.id}`)}
               </button>
             ))}
+            <LanguagePicker compact id="nav-lang" value={settings.language} onChange={(v) => void updateSettings({ language: v })} />
           </nav>
           <div className="main">
             {(status?.demo || settings.demo) && (

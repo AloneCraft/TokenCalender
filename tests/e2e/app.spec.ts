@@ -193,6 +193,50 @@ test.describe('Token Calendar', () => {
     await expect(page.locator('h1')).toContainText('モデル・エフォート別の消費率');
   });
 
+  test('言語の選択欄: 国旗とその言語の文字の言語名を並べ、選ぶとすぐ切り替わる', async () => {
+    env = makeEnv(true);
+    ({ app, page } = await launch(env));
+    await page.getByRole('button', { name: '設定', exact: true }).click();
+    const button = page.locator('#s-l-button');
+    // 既定は OS（ここでは ja-JP）に合わせる
+    await expect(button).toContainText('OS に合わせる（今は 日本語）');
+    await button.click();
+    const list = page.getByRole('listbox');
+    // OS に合わせる ＋ 登録されている言語（日本語・English・한국어）
+    await expect(list.getByRole('option')).toHaveCount(4);
+    await expect(list.locator('[data-value="ko"] [lang="ko"]')).toHaveText('한국어');
+    await expect(list.locator('[data-value="ko"] svg.flag')).toHaveCount(1);
+    await expect(list.locator('[data-value="ja"] [lang="ja"]')).toHaveText('日本語');
+    await expect(list.locator('[data-value="en"] [lang="en"]').first()).toHaveText('English');
+    await expect(list.locator('[data-value="ja"] svg.flag')).toHaveCount(1);
+    // キーボードで English を選ぶ（OS → 日本語 → English）
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('nav')).toContainText('Limits', { timeout: 10000 });
+    await expect(page.locator('#s-l-button')).toContainText('English');
+    // 案内帯の下の小さい選択欄からも戻せる
+    await page.locator('#nav-lang-button').click();
+    await page.locator('#nav-lang-list [data-value="ja"]').click();
+    await expect(page.locator('nav')).toContainText('利用枠', { timeout: 10000 });
+  });
+
+  test('OS の言語が韓国語なら韓国語で表示し、確認ダイアログの用語も同じ辞書から出す', async () => {
+    env = makeEnv(true);
+    ({ app, page } = await launch(env, 'ko-KR'));
+    await expect(page.locator('h1')).toContainText('이용 한도 대시보드', { timeout: 20000 });
+    await expect(page.locator('nav')).toContainText('캘린더');
+    const codex = page.locator('section[aria-label^="Codex"]').first();
+    await expect(codex).toContainText('주간 한도', { timeout: 20000 });
+    await expect(codex.locator('.metric').first()).toContainText('공식');
+    // 数字は韓国語の規則（만・억）、期間も韓国語で出る
+    await expect(codex).toContainText('리셋까지');
+    // 書式から日本語・英語の文が混ざっていない
+    const text = await page.locator('.page').innerText();
+    expect(text).not.toMatch(/[ぁ-んァ-ヶ]/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ko-KR');
+  });
+
   test('OS の言語が英語なら英語で表示する', async () => {
     env = makeEnv(true);
     ({ app, page } = await launch(env, 'en-US'));

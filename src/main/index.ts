@@ -12,8 +12,19 @@ import * as v from '../shared/validate.ts';
 import { WorkerHub } from './workers.ts';
 import { bridgePaths, installBridge, previewBridge, uninstallBridge } from './claudeBridge.ts';
 import { toCsv } from './csv.ts';
+import { resolveLanguage, translate } from '../shared/i18n/languages.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * 本体の確認ダイアログなどの文を、画面と同じ表示言語で作る。
+ * OS の言語は app.getLocale()（起動時の --lang を含む。画面の navigator.languages と同じ元）を先に見る。
+ */
+async function mainT(): Promise<(key: string, vars?: Record<string, string | number>) => string> {
+  const s = await hub.call<Settings>('getSettings', null).catch(() => null);
+  const lang = resolveLanguage(s?.language ?? 'system', [app.getLocale(), ...app.getPreferredSystemLanguages()]);
+  return (key, vars) => translate(lang, key, vars);
+}
 
 app.setName(APP_NAME);
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -94,15 +105,16 @@ function registerIpc(): void {
   handle('bridgePreview', () => previewBridge(bp));
   handle('bridgeInstall', async () => {
     const pv = previewBridge(bp);
+    const t = await mainT();
     // 画面での確認に加え、OS の確認ダイアログでも同意を得る
     const r = await dialog.showMessageBox(win!, {
       type: 'question',
-      buttons: ['変更する', 'やめる'],
+      buttons: [t('dlg.bridgeInstall.ok'), t('dlg.cancel')],
       defaultId: 1,
       cancelId: 1,
-      title: 'Claude Code の設定変更',
-      message: `${pv.settingsPath} の statusLine を変更します。`,
-      detail: `変更前の設定はバックアップします。\n変更後: ${JSON.stringify(pv.proposedStatusLine)}`,
+      title: t('dlg.bridgeInstall.title'),
+      message: t('dlg.bridgeInstall.message', { path: pv.settingsPath }),
+      detail: t('dlg.bridgeInstall.detail', { value: JSON.stringify(pv.proposedStatusLine) }),
     });
     if (r.response !== 0) return { ok: false, message: 'cancelled' };
     const res = installBridge(bp);
@@ -111,13 +123,14 @@ function registerIpc(): void {
     return { ok: res.ok, message: res.ok ? res.backupPath : res.message };
   });
   handle('bridgeUninstall', async () => {
+    const t = await mainT();
     const r = await dialog.showMessageBox(win!, {
       type: 'question',
-      buttons: ['元に戻す', 'やめる'],
+      buttons: [t('dlg.bridgeUninstall.ok'), t('dlg.cancel')],
       defaultId: 1,
       cancelId: 1,
-      title: 'Claude Code の設定を元に戻す',
-      message: `${bp.settingsPath} の statusLine を連携前の状態に戻します。`,
+      title: t('dlg.bridgeUninstall.title'),
+      message: t('dlg.bridgeUninstall.message', { path: bp.settingsPath }),
     });
     if (r.response !== 0) return { ok: false, message: 'cancelled' };
     const res = uninstallBridge(bp);
@@ -140,7 +153,7 @@ async function exportData(p: unknown): Promise<ExportResult> {
   const rows = await hub.call<Record<string, unknown>[]>('exportRows', { kind, zone, pricingMode: settings.pricingMode });
   const body =
     format === 'json'
-      ? JSON.stringify({ app: APP_NAME, kind, exportedAt: new Date().toISOString(), note: 'api_cost_equivalent_usd は API 料金換算の参考額であり、実際の請求額ではありません', rows }, null, 1)
+      ? JSON.stringify({ app: APP_NAME, kind, exportedAt: new Date().toISOString(), note: (await mainT())('export.note'), rows }, null, 1)
       : toCsv(rows);
   writeFileSync(r.filePath, body, 'utf8');
   return { ok: true, path: r.filePath, rows: rows.length, message: null };
@@ -163,14 +176,15 @@ async function importData(): Promise<unknown> {
 }
 
 async function deleteAppData(): Promise<{ ok: boolean }> {
+  const t = await mainT();
   const r = await dialog.showMessageBox(win!, {
     type: 'warning',
-    buttons: ['削除する', 'やめる'],
+    buttons: [t('dlg.delete.ok'), t('dlg.cancel')],
     defaultId: 1,
     cancelId: 1,
-    title: 'アプリのデータを削除',
-    message: 'このアプリが作った集計データ（DB）を削除します。元の Claude / Codex のログは削除しません。',
-    detail: '削除した後、ログからもう一度読み込みます。手動記録した利用率は元に戻せません。',
+    title: t('dlg.delete.title'),
+    message: t('dlg.delete.message'),
+    detail: t('dlg.delete.detail'),
   });
   if (r.response !== 0) return { ok: false };
   await hub.stop();

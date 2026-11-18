@@ -14,6 +14,7 @@ import type {
   SimulateRequest,
   TimelineRequest,
 } from './api.ts';
+import { LANG_CODES } from './i18n/languages.ts';
 
 export class ValidationError extends Error {}
 
@@ -187,7 +188,7 @@ export function settingsPatch(v: unknown): Partial<Settings> {
   if ('usdJpyUpdatedAt' in o) out.usdJpyUpdatedAt = o.usdJpyUpdatedAt === null ? null : num(o.usdJpyUpdatedAt, 'usdJpyUpdatedAt', 0, 8.64e15);
   if ('pricingMode' in o) out.pricingMode = oneOf(o.pricingMode, 'pricingMode', ['historical', 'current'] as const);
   if ('theme' in o) out.theme = oneOf(o.theme, 'theme', ['system', 'light', 'dark'] as const);
-  if ('language' in o) out.language = oneOf(o.language, 'language', ['system', 'ja', 'en'] as const);
+  if ('language' in o) out.language = oneOf(o.language, 'language', ['system', ...LANG_CODES] as const);
   if ('demo' in o) out.demo = bool(o.demo, 'demo');
   if ('reservePct' in o) out.reservePct = num(o.reservePct, 'reservePct', 0, 50);
   if ('budgetWeekdayWeights' in o) {

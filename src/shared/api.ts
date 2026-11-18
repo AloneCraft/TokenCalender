@@ -2,6 +2,7 @@
 // 画面に渡すのは集計済みの値だけで、ログ本文やファイルパスは渡さない（データ元画面のフォルダー名を除く）。
 
 import type { PlanOverview, RatesView, SimulateRequest, SimulateResult } from './plan.ts';
+import type { LanguageSetting } from './i18n/languages.ts';
 export type * from './plan.ts';
 
 export type Provider = 'claude' | 'codex';
@@ -371,8 +372,8 @@ export interface Settings {
   usdJpyUpdatedAt: number | null;
   pricingMode: PricingMode;
   theme: 'system' | 'light' | 'dark';
-  /** system = OS の言語設定に合わせる（日本語なら日本語、それ以外は英語） */
-  language: 'system' | 'ja' | 'en';
+  /** system = OS の言語設定に合わせる（登録された言語から選び、無ければ英語）。言語は src/shared/i18n/languages.ts */
+  language: LanguageSetting;
   demo: boolean;
   extraSources: { provider: Provider; path: string }[];
   /** リセット時に残しておきたい利用枠（ポイント） */

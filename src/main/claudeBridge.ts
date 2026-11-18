@@ -6,6 +6,7 @@
 // - 解除時は、現在の statusLine が本アプリの設定のままである場合だけ元に戻す（利用者が後で変えた設定は上書きしない）。
 // - 連携スクリプトはすべての失敗を握りつぶして終了コード 0 で終わり、Claude Code の通常利用を妨げない。
 // - 書き出すのは時刻と rate_limits（利用率・リセット時刻）だけ。会話・パス・費用などは書き出さない。
+// - 画面に出す文は返さず、記号（message: 'not_ours' など、note: 辞書の鍵）を返す。表示の言語で訳すのは画面側。
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -88,10 +89,10 @@ function readSettings(path: string): { exists: boolean; json: Record<string, unk
   if (!existsSync(path)) return { exists: false, json: {}, error: null };
   try {
     const j = JSON.parse(readFileSync(path, 'utf8')) as unknown;
-    if (!j || typeof j !== 'object' || Array.isArray(j)) return { exists: true, json: null, error: 'settings.json の形式を解釈できません' };
+    if (!j || typeof j !== 'object' || Array.isArray(j)) return { exists: true, json: null, error: 'settings_invalid' };
     return { exists: true, json: j as Record<string, unknown>, error: null };
-  } catch (e) {
-    return { exists: true, json: null, error: `settings.json を読めません: ${String((e as Error).message)}` };
+  } catch {
+    return { exists: true, json: null, error: 'settings_unreadable' };
   }
 }
 
@@ -119,11 +120,8 @@ export function previewBridge(p: BridgePaths): BridgePreview {
     outputPath: p.outputPath,
     installed: isOurs(current),
     backupPath: null,
-    note: s.error
-      ? s.error
-      : current && !isOurs(current)
-        ? '既存のステータスライン表示は保存し、連携スクリプトから呼び出して共存させます（Windows では cmd.exe 経由。動作は未検証）。'
-        : 'Claude Code のデスクトップ版でステータスラインが動作するかは未確認です。動作しない場合は手動記録を使ってください。',
+    // 表示する文は画面側で訳す（ここでは辞書の鍵を返す）
+    note: s.error ? `msg.${s.error}` : current && !isOurs(current) ? 'bridge.note.coexist' : 'bridge.note.desktopUnverified',
   };
 }
 
@@ -150,14 +148,14 @@ export function uninstallBridge(p: BridgePaths): { ok: boolean; message: string 
   const s = readSettings(p.settingsPath);
   if (!s.json) return { ok: false, message: s.error };
   if (!isOurs(s.json.statusLine)) {
-    return { ok: false, message: '現在のステータスライン設定は本アプリのものではないため、変更しませんでした。' };
+    return { ok: false, message: 'not_ours' };
   }
   const next: Record<string, unknown> = { ...s.json };
   if (existsSync(p.originalPath)) {
     try {
       next.statusLine = JSON.parse(readFileSync(p.originalPath, 'utf8'));
     } catch {
-      return { ok: false, message: '保存していた元の設定を読めません。バックアップから手動で戻してください。' };
+      return { ok: false, message: 'original_unreadable' };
     }
   } else {
     delete next.statusLine;
