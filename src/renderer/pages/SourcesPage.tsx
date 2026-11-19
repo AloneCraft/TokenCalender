@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useBusy } from '../busy.ts';
+import { BarGauge } from '../components/Gauge.tsx';
+import { Icon } from '../components/Icons.tsx';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useMsg, useT } from '../i18n/index.ts';
@@ -8,14 +11,41 @@ import type { BillingMode, BridgePreview, IngestStatus } from '../../shared/api.
 const STATUS_BADGE: Record<string, string> = { ok: 'ok', missing: '', permission_denied: 'danger', error: 'danger', disabled: '', pending: 'warn' };
 
 export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
-  const { status, quota } = useApp();
+  const { status, quota, refreshStatus } = useApp();
   const t = useT();
   const tMsg = useMsg();
   const [msg, setMsg] = useState<string | null>(null);
   const [wsl, setWsl] = useState<{ distro: string; provider: 'claude' | 'codex'; path: string }[] | null>(null);
   const [preview, setPreview] = useState<BridgePreview | null>(null);
   const [accountDraft, setAccountDraft] = useState<Record<string, string>>({});
+  // 変更中のデータ元。変更が終わるまで、その行の操作を止める（反応が無いように見えて、別の値を選んでしまうのを防ぐ）
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+  // 変更中に画面へ出す値（選んだ直後に元の値へ戻って見えないようにする）
+  const [chosen, setChosen] = useState<Record<string, BillingMode>>({});
+  useBusy('sources', pending.size > 0);
   const now = Date.now();
+
+  const update = async (sourceId: string, patch: { accountKey?: string | null; billingMode?: BillingMode; enabled?: boolean }) => {
+    setPending((p) => new Set(p).add(sourceId));
+    if (patch.billingMode) setChosen((c) => ({ ...c, [sourceId]: patch.billingMode! }));
+    try {
+      const r = await api().updateSource({ sourceId, ...patch });
+      setMsg(r.ok ? null : t('src.updateFailed'));
+    } catch (e) {
+      setMsg(`${t('src.updateFailed')} (${String(e)})`);
+    } finally {
+      await refreshStatus().catch(() => undefined);
+      setChosen((c) => {
+        const { [sourceId]: _drop, ...rest } = c;
+        return rest;
+      });
+      setPending((p) => {
+        const n = new Set(p);
+        n.delete(sourceId);
+        return n;
+      });
+    }
+  };
 
   const addFolder = async (provider: 'claude' | 'codex') => {
     const p = await api().pickFolder();
@@ -46,6 +76,11 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
         </div>
         <div className="faint">{t('src.lead')}</div>
         {msg && <div className="note">{msg}</div>}
+        {progress && progress.filesTotal > 0 && (
+          <div className="src-progress">
+            <BarGauge fill={(progress.filesDone / progress.filesTotal) * 100} tone="info" label={`${progress.filesDone} / ${progress.filesTotal}`} />
+          </div>
+        )}
         {progress && (
           <div className="faint" style={{ margin: '6px 0' }}>
             {t('src.progress')}:{' '}
@@ -80,7 +115,9 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                   </div>
                 </td>
                 <td>
-                  <span className={`badge ${STATUS_BADGE[s.status] ?? ''}`}>{t(`src.status.${s.status}`)}</span>
+                  <span className={`badge ${STATUS_BADGE[s.status] ?? ''}`}>
+                    <Icon name={s.status === 'ok' ? 'check' : s.status === 'pending' ? 'clock' : s.status === 'disabled' || s.status === 'missing' ? 'chat' : 'alert'} size={12} /> {t(`src.status.${s.status}`)}
+                  </span>
                   {s.detail && <div className="faint">{s.detail}</div>}
                   {s.filesWithErrors > 0 && <div className="faint">{t('src.unreadable', { count: s.filesWithErrors })}</div>}
                   {s.badLines > 0 && (
@@ -97,9 +134,10 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                     placeholder={t('account.unknown')}
                     value={accountDraft[s.sourceId] ?? s.accountKey ?? ''}
                     onChange={(e) => setAccountDraft({ ...accountDraft, [s.sourceId]: e.target.value })}
+                    disabled={pending.has(s.sourceId)}
                     onBlur={(e) => {
                       const v = e.target.value.trim();
-                      if (v !== (s.accountKey ?? '')) void api().updateSource({ sourceId: s.sourceId, accountKey: v || null });
+                      if (v !== (s.accountKey ?? '')) void update(s.sourceId, { accountKey: v || null });
                     }}
                     style={{ width: 140 }}
                   />
@@ -108,8 +146,9 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                 <td>
                   <select
                     aria-label={t('src.billing')}
-                    value={s.billingMode}
-                    onChange={(e) => void api().updateSource({ sourceId: s.sourceId, billingMode: e.target.value as BillingMode })}
+                    value={chosen[s.sourceId] ?? s.billingMode}
+                    disabled={pending.has(s.sourceId)}
+                    onChange={(e) => void update(s.sourceId, { billingMode: e.target.value as BillingMode })}
                   >
                     {(['unknown', 'subscription', 'api', 'extra_credit'] as const).map((b) => (
                       <option key={b} value={b}>
@@ -117,13 +156,15 @@ export function SourcesPage({ progress }: { progress: IngestStatus | null }) {
                       </option>
                     ))}
                   </select>
+                  {pending.has(s.sourceId) && <span className="spinner" role="status" aria-label={t('common.loading')} style={{ marginLeft: 6, verticalAlign: 'middle', display: 'inline-block' }} />}
                 </td>
                 <td>
                   <input
                     type="checkbox"
                     aria-label={t('src.enabled')}
                     checked={s.enabled}
-                    onChange={(e) => void api().updateSource({ sourceId: s.sourceId, enabled: e.target.checked })}
+                    disabled={pending.has(s.sourceId)}
+                    onChange={(e) => void update(s.sourceId, { enabled: e.target.checked })}
                   />
                 </td>
               </tr>

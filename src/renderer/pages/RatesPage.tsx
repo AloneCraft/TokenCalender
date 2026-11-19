@@ -7,7 +7,7 @@ import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
 import { Seg } from '../components/Seg.tsx';
 import { useBusy } from '../busy.ts';
-import { RatioCell } from '../components/Gauge.tsx';
+import { RangeBar, RatioCell } from '../components/Gauge.tsx';
 import { EChart, type EChartsOption } from '../components/EChart.tsx';
 import { fmtDate, fmtInt, fmtTokens, groupLabel, windowName } from '../format.ts';
 import type { Band, RatesView } from '../../shared/api.ts';
@@ -58,6 +58,7 @@ export function RatesPage() {
     };
   }, [provider, range]);
 
+  const maxPerTurn = Math.max(1e-9, ...(data?.groups ?? []).map((g) => g.pctPerTurn?.high ?? 0)) * 1.1;
   const chart = useMemo<EChartsOption | null>(() => {
     if (!data) return null;
     const rows = data.groups.filter((g) => g.pctPerTurn);
@@ -208,7 +209,10 @@ export function RatesPage() {
                         <td>
                           <span className={`badge ${g.status === 'measured' ? 'ok' : 'est'}`}>{t(`rates.status.${g.status}`)}</span>
                         </td>
-                        <td className="r num">{band(g.pctPerTurn, 3, '%')}</td>
+                        <td className="r num">
+                          {band(g.pctPerTurn, 3, '%')}
+                          {g.pctPerTurn && <RangeBar low={g.pctPerTurn.low} mid={g.pctPerTurn.mid} high={g.pctPerTurn.high} max={maxPerTurn} tone={g.status === 'measured' ? 'ok' : 'info'} label={band(g.pctPerTurn, 3, '%')} />}
+                        </td>
                         <td className="r num">{band(g.pctPerMTokens, 4, '%')}</td>
                         <td className="r num">{band(g.pctPerSession, 2, '%')}</td>
                         <td className="r num">{g.tokensPerTurn != null ? fmtTokens(g.tokensPerTurn) : '—'}</td>

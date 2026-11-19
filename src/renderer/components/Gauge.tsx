@@ -77,3 +77,37 @@ export function RatioCell({ ratio }: { ratio: number | null }) {
     </span>
   );
 }
+
+/** 利用率（使った%）の色分け。70% 未満は緑、90% 未満は橙、それ以上は赤。 */
+export function usedTone(usedPct: number): Tone {
+  return usedPct < 70 ? 'ok' : usedPct < 90 ? 'warn' : 'danger';
+}
+
+/** 表の中に置く、割合の小さな棒。value / max の長さで塗る。 */
+export function CellBar({ value, max, tone = 'info', label }: { value: number; max: number; tone?: Tone; label: string }) {
+  return (
+    <span className="ratio-bar">
+      <BarGauge max={max > 0 ? max : 1} fill={value} tone={tone} label={label} />
+    </span>
+  );
+}
+
+/** 推定の幅（下限〜上限）と中央の点。max は目盛りの右端。 */
+export function RangeBar({ low, mid, high, max, tone = 'info', label }: { low: number; mid: number; high: number; max: number; tone?: Tone; label: string }) {
+  const m = max > 0 ? max : 1;
+  return (
+    <span className="range-bar">
+      <BarGauge max={m} band={{ low, high: Math.max(high, low + m * 0.01) }} marks={[{ at: mid, kind: 'dot', tone }]} tone={tone} label={label} />
+    </span>
+  );
+}
+
+/** 使った割合の棒に、時間の経過（ペースの目安）の線を重ねる。線より右まで塗られていれば、ペースより速い。 */
+export function PaceBar({ usedPct, elapsedPct, stale, label }: { usedPct: number; elapsedPct: number | null; stale?: boolean; label: string }) {
+  const tone = usedTone(usedPct);
+  return (
+    <div className={stale ? 'pace-bar stale' : 'pace-bar'}>
+      <BarGauge fill={usedPct} tone={tone} marks={elapsedPct == null ? [] : [{ at: elapsedPct, kind: 'line', tone: 'info' }]} label={label} />
+    </div>
+  );
+}

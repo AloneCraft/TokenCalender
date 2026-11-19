@@ -137,3 +137,25 @@ export interface SimulateResult {
   /** 推定が無いなどで計算できない理由 */
   unavailable: string | null;
 }
+
+/**
+ * プランごとの「消費の重さ」の比較。同じモデル・エフォートで、トークンあたりの消費%（公式の利用率の増え方）を
+ * プランごとの期間で求め、基準のプラン（最も下位）に対する比にする。
+ * 比が公称の倍率（例: 20x）に近ければ公称どおり、小さければ容量の差は公称より小さい、と読める。
+ */
+export interface PlanCompareView {
+  provider: 'codex';
+  windowKey: string | null;
+  basePlan: string | null;
+  /** プランごとの観測期間（同じプランの期間が複数あるときは、観測の変化量が最も大きいもの） */
+  plans: { plan: string; fromMs: number; toMs: number; observations: number; totalDeltaPct: number; nominal: number | null }[];
+  /** 基準のプランと比べられるモデル・エフォートごとの比 */
+  groups: {
+    group: string;
+    base: Band;
+    byPlan: { plan: string; pctPerMTokens: Band; /** 基準 ÷ このプラン（容量の倍率）。幅は両端の組み合わせ */ ratio: Band; status: 'measured' | 'tentative' }[];
+  }[];
+  /** プランごとの、いちばん精度の高い（幅が最も狭い）「実測」の比較。グループの比を平均すると、精度の低いものに引きずられるため。 */
+  summary: { plan: string; bestGroup: string; best: Band; measuredGroups: number; nominal: number | null }[];
+  unavailable: 'no_window' | 'one_plan' | 'no_common_group' | null;
+}

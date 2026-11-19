@@ -34,6 +34,7 @@ import type {
   UsageTotals,
 } from '../shared/api.ts';
 import type { Provider } from '../core/model/types.ts';
+import { splitByPlan } from '../core/quota/planRuns.ts';
 import { judgeChat, MIN_REQUESTS_TO_COMPARE } from '../core/chat/judge.ts';
 
 const DAY = 86400000;
@@ -992,19 +993,6 @@ export class QueryService {
 }
 
 const EMPTY_CUM: CumulativeCell = { cycleKnown: false, cycleEstimated: false, prior: null, increment: null, cumulative: null, resetInBucket: false, oldCycleUsage: 0 };
-
-/** 観測を、プランが同じ連続した範囲ごとに分ける。プランの記録が無い観測は、そのとき続いている範囲に含める。 */
-export function splitByPlan<T extends { planType: string | null }>(obs: T[]): { plan: string | null; obs: T[] }[] {
-  const runs: { plan: string | null; obs: T[] }[] = [];
-  for (const o of obs) {
-    const last = runs[runs.length - 1];
-    if (last && (o.planType == null || last.plan == null || o.planType === last.plan)) {
-      last.obs.push(o);
-      if (last.plan == null) last.plan = o.planType;
-    } else runs.push({ plan: o.planType, obs: [o] });
-  }
-  return runs;
-}
 
 function pickCum(c: CumulativeCell): CumulativeCell {
   return {

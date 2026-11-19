@@ -130,9 +130,12 @@ export function App() {
   }, []);
 
   const zone = settings.zone ?? localZone();
+  const refreshStatus = useCallback(async () => {
+    setStatus(await api().getStatus());
+  }, []);
   const ctx: AppCtx = useMemo(
-    () => ({ settings, zone, money: { currency: settings.currency, usdJpy: settings.usdJpy }, filters, setFilters, status, quota, dataVersion, slowVersion, updateSettings }),
-    [settings, zone, filters, setFilters, status, quota, dataVersion, slowVersion, updateSettings],
+    () => ({ settings, zone, money: { currency: settings.currency, usdJpy: settings.usdJpy }, filters, setFilters, status, quota, dataVersion, slowVersion, updateSettings, refreshStatus }),
+    [settings, zone, filters, setFilters, status, quota, dataVersion, slowVersion, updateSettings, refreshStatus],
   );
   const lang = resolveLang(settings.language);
   // 書式（日時・期間）の言語は描画の前にそろえる

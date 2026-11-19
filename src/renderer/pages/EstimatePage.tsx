@@ -6,6 +6,9 @@ import { EChart, type EChartsOption } from '../components/EChart.tsx';
 import { planLabel, fmtAgo, fmtDateTime, fmtDuration, fmtMoney, fmtPct, fmtRange, fmtTokens, roundSig, windowName } from '../format.ts';
 import type { EstimateView, Range } from '../../shared/api.ts';
 import { ManualEntry } from '../components/ManualEntry.tsx';
+import { BarGauge, CellBar, PaceBar, RangeBar } from '../components/Gauge.tsx';
+import { Icon } from '../components/Icons.tsx';
+import { PlanCompare } from '../components/PlanCompare.tsx';
 
 export function EstimatePage() {
   const { quota, zone, money, settings, dataVersion, filters } = useApp();
@@ -75,6 +78,10 @@ export function EstimatePage() {
   const capC = est?.capacityCostNano ?? est?.reference?.capacityCostNano ?? null;
   const isRef = !!est && !est.capacityTokens && !!est.reference;
   const now = Date.now();
+  const segRows = est ? est.segments.slice(-60).reverse() : [];
+  const maxDelta = Math.max(1, ...segRows.map((s) => s.deltaPct));
+  const maxCap = Math.max(1, ...segRows.map((s) => s.capacityCostNano?.high ?? 0));
+  const windowMin = est ? Number(est.windowKey.split('|')[3]) || null : null;
 
   return (
     <div className="layout">
@@ -114,6 +121,7 @@ export function EstimatePage() {
                     {isRef ? ` · ${t('est.reference')}` : ''}
                   </div>
                   <div className="big">{est.costEstimateSuppressed ? '—' : range(capC, 'cost')}</div>
+                  {capC && !est.costEstimateSuppressed && <RangeBar low={capC.low} mid={capC.mid} high={capC.high} max={capC.high * 1.15} tone="info" label={range(capC, 'cost')} />}
                   {capC && !est.costEstimateSuppressed && (
                     <div className="faint">
                       {t('est.perPercent')}: {fmtMoney(roundSig(capC.mid / 100), money)} {t('common.equiv')}
@@ -127,6 +135,7 @@ export function EstimatePage() {
                     {isRef ? ` · ${t('est.reference')}` : ''}
                   </div>
                   <div className="big">{range(capT, 'tokens')}</div>
+                  {capT && <RangeBar low={capT.low} mid={capT.mid} high={capT.high} max={capT.high * 1.15} tone="info" label={range(capT, 'tokens')} />}
                   {capT && (
                     <div className="faint">
                       {t('est.perPercent')}: {fmtTokens(roundSig(capT.mid / 100))} tok
@@ -181,6 +190,7 @@ export function EstimatePage() {
             <div className="faint">{t('est.overlayNote')}</div>
           </div>
         )}
+        {est?.windowKey.startsWith('codex') && <PlanCompare />}
         {est && est.segments.length > 0 && (
           <div className="card">
             <h2>{t('est.segments')}</h2>
@@ -196,10 +206,7 @@ export function EstimatePage() {
                 </tr>
               </thead>
               <tbody>
-                {est.segments
-                  .slice(-60)
-                  .reverse()
-                  .map((s) => (
+                {segRows.map((s) => (
                     <tr key={`${s.startMs}-${s.endMs}`}>
                       <td>
                         {fmtRange(fmtDateTime(s.startMs, zone), fmtDateTime(s.endMs, zone))}
@@ -207,12 +214,26 @@ export function EstimatePage() {
                           {s.p1}% → {s.p2}%
                         </div>
                       </td>
-                      <td className="r">{s.deltaPct}</td>
+                      <td className="r">
+                        {s.deltaPct}
+                        <CellBar value={s.deltaPct} max={maxDelta} tone={s.adopted ? 'ok' : 'info'} label={`${s.deltaPct}%`} />
+                      </td>
                       <td className="r">{fmtTokens(s.tokens)}</td>
                       <td className="r">{fmtMoney(s.costNano, money)}</td>
-                      <td className="r">{s.capacityCostNano ? fmtRange(fmtMoney(roundSig(s.capacityCostNano.low), money), fmtMoney(roundSig(s.capacityCostNano.high), money)) : '—'}</td>
+                      <td className="r">
+                        {s.capacityCostNano ? fmtRange(fmtMoney(roundSig(s.capacityCostNano.low), money), fmtMoney(roundSig(s.capacityCostNano.high), money)) : '—'}
+                        {s.capacityCostNano && <RangeBar low={s.capacityCostNano.low} mid={s.capacityCostNano.mid} high={s.capacityCostNano.high} max={maxCap} tone={s.adopted ? 'ok' : 'info'} label={fmtMoney(roundSig(s.capacityCostNano.mid), money)} />}
+                      </td>
                       <td>
-                        {s.adopted ? <span className="badge ok">{t('est.adopted')}</span> : <span className="badge">{t('est.excluded')}</span>}
+                        {s.adopted ? (
+                          <span className="badge ok">
+                            <Icon name="check" size={12} /> {t('est.adopted')}
+                          </span>
+                        ) : (
+                          <span className="badge">
+                            <Icon name="alert" size={12} /> {t('est.excluded')}
+                          </span>
+                        )}
                         {[...s.exclusions, ...s.warnings].map((r) => (
                           <div key={r} className="faint">
                             {t(`reason.${r}`)}
@@ -220,7 +241,7 @@ export function EstimatePage() {
                         ))}
                       </td>
                     </tr>
-                  ))}
+                ))}
               </tbody>
             </table>
           </div>
@@ -237,8 +258,18 @@ export function EstimatePage() {
                   {fmtPct(est.pace.official.remainingPercent)}{t('est.usedParen', { pct: fmtPct(est.pace.official.usedPercent) })}
                   <div className="faint">
                     {t(`quota.source.${est.pace.official.source}`)} · {t('quota.observed')} {fmtAgo(est.pace.official.observedAtMs, now)}
-                    {est.pace.official.stale && <span className="badge warn"> {t('quota.stale')}</span>}
+                    {est.pace.official.stale && (
+                      <span className="badge warn">
+                        <Icon name="clock" size={12} /> {t('quota.stale')}
+                      </span>
+                    )}
                   </div>
+                  <PaceBar
+                    usedPct={est.pace.official.usedPercent}
+                    stale={est.pace.official.stale}
+                    elapsedPct={windowMin && est.pace.timeToResetMs != null ? Math.max(0, Math.min(100, (1 - est.pace.timeToResetMs / (windowMin * 60000)) * 100)) : null}
+                    label={fmtPct(est.pace.official.usedPercent)}
+                  />
                 </dd>
                 <dt>{t('quota.resetIn')}</dt>
                 <dd>{est.pace.resetTimePassedUnconfirmed ? t('quota.resetPassed') : fmtDuration(est.pace.timeToResetMs)}</dd>
@@ -250,7 +281,18 @@ export function EstimatePage() {
                   <div className="faint">{t('est.auxNote')}</div>
                 </dd>
                 <dt>{t('pace.burn')}</dt>
-                <dd>{est.pace.burnRatePctPerHour == null ? '—' : t('est.perHour', { v: est.pace.burnRatePctPerHour.toFixed(1) })}</dd>
+                <dd>
+                  {est.pace.burnRatePctPerHour == null ? '—' : t('est.perHour', { v: est.pace.burnRatePctPerHour.toFixed(1) })}
+                  {est.pace.burnRatePctPerHour != null && est.pace.evenPacePctPerHour != null && (
+                    <BarGauge
+                      max={Math.max(est.pace.burnRatePctPerHour, est.pace.evenPacePctPerHour) * 1.3 || 1}
+                      fill={est.pace.burnRatePctPerHour}
+                      marks={[{ at: est.pace.evenPacePctPerHour, kind: 'line', tone: 'info' }]}
+                      tone={est.pace.burnRatePctPerHour > est.pace.evenPacePctPerHour * 1.5 ? 'danger' : est.pace.burnRatePctPerHour > est.pace.evenPacePctPerHour ? 'warn' : 'ok'}
+                      label={est.pace.burnRatePctPerHour.toFixed(1)}
+                    />
+                  )}
+                </dd>
                 <dt>{t('pace.even')}</dt>
                 <dd>{est.pace.evenPacePctPerHour == null ? '—' : t('est.perHour', { v: est.pace.evenPacePctPerHour.toFixed(2) })}</dd>
                 <dt>{t('pace.exhaust')}</dt>
@@ -264,7 +306,7 @@ export function EstimatePage() {
               <div className="faint">{t('quota.noWindows')}</div>
             )}
             <div className={`note ${est.pace.outlook === 'runs_out' ? 'warn' : ''}`} style={{ marginTop: 8 }}>
-              {t(`pace.outlook.${est.pace.outlook}`)}
+              <Icon name={est.pace.outlook === 'runs_out' ? 'alert' : 'check'} size={14} /> {t(`pace.outlook.${est.pace.outlook}`)}
             </div>
           </div>
         )}

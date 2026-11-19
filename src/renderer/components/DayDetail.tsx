@@ -1,3 +1,4 @@
+import { CellBar } from './Gauge.tsx';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.ts';
 import { commonFilter, useApp } from '../state.ts';
@@ -105,6 +106,9 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
               {d.byModel.map((m) => (
                 <tr key={m.model}>
                   <td>{m.model}</td>
+                  <td style={{ width: 120 }}>
+                    <CellBar value={m.tokens} max={Math.max(1, ...d.byModel.map((x) => x.tokens))} tone="info" label={fmtTokens(m.tokens, false)} />
+                  </td>
                   <td className="r">{fmtTokens(m.tokens, false)}</td>
                   <td className="r">{m.priced ? fmtMoney(m.costNano, money) : t('cal.unpriced')}</td>
                 </tr>

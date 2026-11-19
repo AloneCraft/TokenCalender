@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitByPlan } from '../../src/query/service.ts';
+import { splitByPlan } from '../../src/core/quota/planRuns.ts';
 
 const o = (planType: string | null, id: number) => ({ planType, id });
 

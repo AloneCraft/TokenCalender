@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Claude Code と Codex の使用量を可視化し、週制限の実効容量を推定するデスクトップアプリ",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {

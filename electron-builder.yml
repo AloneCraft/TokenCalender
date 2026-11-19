@@ -1,7 +1,7 @@
 # 配布設定。名称を変えるときは src/shared/appInfo.ts と合わせる。
 appId: local.tokencalendar.app
 productName: Token Calendar
-copyright: Copyright © 2026
+copyright: Copyright © 2026 AloneCraft
 directories:
   output: release
   buildResources: build

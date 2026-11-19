@@ -544,10 +544,20 @@ export const ja = {
   'chat.active': '動作中',
   'chat.size': 'このチャットの量',
   'chat.cache': 'キャッシュの効き',
-  'chat.share': '今週の使用量に占める割合',
+  'chat.share': '直近7日のトークンに占める割合',
   'chat.median': '普段',
   'chat.p90': '多い目安',
   'chat.note': '自分の過去30日のチャットと比べた判定です。成功したかどうかは、ログからは分かりません。',
+  'plan.cmp.title': '公称の倍率の確かめ（プラン別の消費の重さ）',
+  'plan.cmp.lead': 'プランが変わった期間ごとに、同じモデル・エフォートで、トークンあたりに減る公式の利用率（%）を比べます。基準のプランに対する比が、容量の倍率の目安です。',
+  'plan.cmp.caveat': '期間が違うため、その間の制限の変更やキャンペーンは区別できません。集計には「実測」のモデルだけを使います。',
+  'plan.cmp.base': '基準',
+  'plan.cmp.nominal': '公称',
+  'plan.cmp.best': '最も精度の高い比較',
+  'plan.cmp.half': '公称の半分',
+  'plan.cmp.none': '比べられるプランの期間がまだありません。',
+  'plan.cmp.tentative': '暫定',
+  'src.updateFailed': '変更できませんでした。取り込みが終わってから、もう一度お試しください。',
 } as const;
 
 export type MessageKey = keyof typeof ja;

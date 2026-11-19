@@ -1,7 +1,7 @@
 // 画面（renderer）と裏側（main / 別スレッド）で共有する型。
 // 画面に渡すのは集計済みの値だけで、ログ本文やファイルパスは渡さない（データ元画面のフォルダー名を除く）。
 
-import type { PlanOverview, RatesView, SimulateRequest, SimulateResult } from './plan.ts';
+import type { PlanCompareView, PlanOverview, RatesView, SimulateRequest, SimulateResult } from './plan.ts';
 import type { LanguageSetting } from './i18n/languages.ts';
 export type * from './plan.ts';
 
@@ -460,6 +460,7 @@ export interface TokenCalendarApi {
   dayDetail(req: DayDetailRequest): Promise<DayDetailResponse>;
   recent(req: { zone: string; pricingMode: PricingMode; limit: number }): Promise<RecentResponse>;
   currentChats(): Promise<CurrentChat[]>;
+  planCompare(): Promise<PlanCompareView>;
   quotaOverview(): Promise<QuotaOverview>;
   estimate(req: { windowKey: string; pricingMode: PricingMode }): Promise<EstimateView>;
   analysis(req: AnalysisRequest): Promise<AnalysisSeries>;

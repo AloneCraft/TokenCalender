@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useApp } from '../state.ts';
 import { useT } from '../i18n/index.ts';
-import { fmtAgo, fmtMoney, fmtTime, fmtTokens } from '../format.ts';
+import { fmtAgo, fmtMoney, fmtPct, fmtTime, fmtTokens } from '../format.ts';
+import { BarGauge } from './Gauge.tsx';
+import { Icon } from './Icons.tsx';
 import type { RecentResponse, RecentUsage, UsageTotals } from '../../shared/api.ts';
 
 const STATE_BADGE: Record<string, string> = { running: 'accent', partial: 'warn', recorded: 'ok', waiting: '' };
@@ -43,7 +45,9 @@ export function RecentPanel() {
         <span>
           <span className="badge">{r.provider === 'claude' ? 'Claude' : 'Codex'}</span> <span className="num">{r.model ?? '—'}</span>
         </span>
-        <span className={`badge ${STATE_BADGE[r.state] ?? ''}`}>{t(`recent.state.${r.state}`)}</span>
+        <span className={`badge ${STATE_BADGE[r.state] ?? ''}`}>
+          {r.state === 'running' ? <span className="live-dot" /> : <Icon name={r.state === 'recorded' ? 'check' : r.state === 'partial' ? 'alert' : 'clock'} size={12} />} {t(`recent.state.${r.state}`)}
+        </span>
       </div>
       <div className="faint">
         {r.projectLabel ?? '—'} · {r.sessionId.slice(0, 8)} · {fmtTime(r.startedAtMs, zone)}–{fmtTime(r.lastUpdatedMs, zone)} ({fmtAgo(r.lastUpdatedMs, now)})
@@ -60,6 +64,14 @@ export function RecentPanel() {
               {totals(r.session)}
             </div>
           </div>
+          {r.turn.input + r.turn.cacheRead + r.turn.cacheWrite > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div className="faint">
+                <Icon name="cache" size={12} /> {t('chat.cache')} {fmtPct((r.turn.cacheRead / (r.turn.input + r.turn.cacheRead + r.turn.cacheWrite)) * 100, 0)}
+              </div>
+              <BarGauge fill={(r.turn.cacheRead / (r.turn.input + r.turn.cacheRead + r.turn.cacheWrite)) * 100} tone="ok" label={t('chat.cache')} />
+            </div>
+          )}
           <div className="faint" style={{ marginTop: 4 }}>
             {t('measure.input')} {fmtTokens(r.turn.input)} · {t('measure.cache_read')} {fmtTokens(r.turn.cacheRead)} · {t('measure.cache_write')} {fmtTokens(r.turn.cacheWrite)} ·{' '}
             {t('measure.output')} {fmtTokens(r.turn.output)}

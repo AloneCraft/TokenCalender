@@ -4,7 +4,9 @@ description: A desktop app to manage your Claude Code and Codex subscription lim
 lang: en
 ---
 
-[日本語](../) · [GitHub repository](https://github.com/AloneCraft/TokenCalender)
+[日本語](../) · [GitHub repository](https://github.com/AloneCraft/TokenCalender) · [**Download (Windows)**](https://github.com/AloneCraft/TokenCalender/releases/latest)
+
+> Install: get `Token Calendar Setup x.y.z.exe` from Releases and run it. If Windows shows "Windows protected your PC", choose "More info" → "Run anyway" (the installer is not code-signed).
 
 Token Calendar is a desktop app that helps you **get the most out of your Claude Code and OpenAI Codex subscription limits**. From your local logs and the official usage rates, it answers:
 

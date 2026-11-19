@@ -37,6 +37,8 @@ export interface AppCtx {
   /** 重い集計（状態表示・推定）用の合図。最短30秒に1回だけ増える */
   slowVersion: number;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
+  /** 状態（データ元など）を今すぐ読み直す。通常は30秒ごとにしか更新されないため、変更の直後に使う */
+  refreshStatus: () => Promise<void>;
 }
 
 export const Ctx = createContext<AppCtx | null>(null);

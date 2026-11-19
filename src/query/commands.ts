@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, type AppStatus, type Settings } from '../shared/api.t
 import * as v from '../shared/validate.ts';
 import { windowKindFromMinutes, type QuotaObservation } from '../core/model/types.ts';
 import { ensureDemoDb } from '../demo/generate.ts';
-import { planOverview, ratesFor, simulatePlan } from './plan.ts';
+import { comparePlans, planOverview, ratesFor, simulatePlan } from './plan.ts';
 
 /** 状態表示のモデル・プロジェクト一覧は直近120日から作る（全期間の集計は遅いため） */
 const RECENT_MS = 120 * 86400000;
@@ -62,6 +62,8 @@ export function handleCommand(method: string, params: unknown, ctx: CommandConte
     }
     case 'currentChats':
       return service.currentChats();
+    case 'planCompare':
+      return comparePlans(db, 'codex', Date.now());
     case 'quotaOverview':
       return service.quotaOverview();
     case 'estimate': {

@@ -243,3 +243,10 @@ pre.code { background: var(--surface-2); border-radius: 6px; padding: 8px; font-
 .ratio-bar { display: inline-block; width: 96px; }
 .ratio-bar .bg-track { height: 10px; border-radius: 5px; }
 .ratio-bar .bg-fill { border-radius: 5px; }
+.range-bar { display: inline-block; width: 120px; vertical-align: middle; }
+.range-bar .bg-track { height: 12px; }
+.pace-bar { margin: 4px 0; }
+.pace-bar.stale { opacity: 0.5; }
+.src-progress { margin: 6px 0; }
+.src-progress .bg-track { height: 10px; }
+.plancmp-row { display: grid; grid-template-columns: 180px minmax(0, 1fr) 150px; gap: 10px; align-items: center; font-size: 12px; }

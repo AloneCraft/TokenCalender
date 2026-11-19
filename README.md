@@ -5,6 +5,18 @@
 Claude Code と OpenAI Codex の使用量をローカルのログから集計し、カレンダーとチャートで表示するデスクトップアプリ。
 公式の利用枠の利用率と照合して、週制限の「実効容量」（自分の使い方で週枠が何トークン・何ドル相当に当たるか）を推定する。
 
+## ダウンロード
+
+**[最新版を入手する（Releases）](https://github.com/AloneCraft/TokenCalender/releases/latest)**: Windows 用インストーラー `Token Calendar Setup x.y.z.exe`
+
+1. Releases の「Assets」から `Token Calendar Setup x.y.z.exe` をダウンロードして実行する
+2. インストール先を選んで進める（管理者権限は不要）
+3. 「Windows によって PC が保護されました」と出た場合は、「詳細情報」→「実行」を選ぶ。コード署名をしていないための表示
+
+Node.js などの別途の導入は要らない。macOS・Linux 版は未確認のため配布していない。
+
+ライセンスは MIT（[LICENSE.txt](LICENSE.txt)）。
+
 名称は `src/shared/appInfo.ts` と `electron-builder.yml` で変えられる。
 
 ## 4種類の数値を区別する

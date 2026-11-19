@@ -9,7 +9,8 @@ import { parseWindowKey, windowKey } from '../core/quota/cycles.ts';
 import { computePace } from '../core/estimate/pace.ts';
 import { changeIntervals, estimateRates, type GroupUsage, type IntervalWithUsage, type ObsPoint } from '../core/plan/rates.ts';
 import { budgetPlan, forecastWindow, simulate, weekdayWeightsFrom, workCapacity, type CyclePath } from '../core/plan/forecast.ts';
-import type { Band, PlanOverview, PlanWindow, ProviderPlan, RatesView, SimulateRequest, SimulateResult } from '../shared/plan.ts';
+import { splitByPlan, CODEX_NOMINAL_MULTIPLE, CODEX_PLAN_ORDER } from '../core/quota/planRuns.ts';
+import type { Band, GroupRateView, PlanCompareView, PlanOverview, PlanWindow, ProviderPlan, RatesView, SimulateRequest, SimulateResult } from '../shared/plan.ts';
 
 const HOUR = 3600000;
 const DAY = 24 * HOUR;
@@ -385,4 +386,59 @@ export function simulatePlan(db: Db, req: SimulateRequest, now: number): Simulat
     workHours: req.workHours,
   });
   return { ...base, pctPerTurn: perTurn, points: sim.points, finalPct: sim.finalPct, exhaustionMs: sim.exhaustionMs };
+}
+
+const MIN_RUN_OBSERVATIONS = 20;
+
+/** 契約プランごとに、同じモデル・エフォートの消費率を比べる（公称の倍率が本当かを確かめるため）。 */
+export function comparePlans(db: Db, provider: 'codex', now: number): PlanCompareView {
+  const key = rateWindowFor(db, provider, now);
+  const view: PlanCompareView = { provider, windowKey: key, basePlan: null, plans: [], groups: [], summary: [], unavailable: null };
+  if (!key) return { ...view, unavailable: 'no_window' };
+  const parts = parseWindowKey(key);
+  const obs = rateObservations(db, parts, 0, now + 1).filter((o) => o.usedPercent != null);
+  const runs = splitByPlan(obs).filter((r) => r.plan != null && r.obs.length >= MIN_RUN_OBSERVATIONS);
+  // 同じプランの期間が複数あれば、観測の変化量が最も大きい期間を使う
+  const best = new Map<string, { plan: string; fromMs: number; toMs: number; observations: number; rates: RatesView }>();
+  for (const r of runs) {
+    const fromMs = r.obs[0]!.observedAtMs;
+    const toMs = r.obs[r.obs.length - 1]!.observedAtMs + 1;
+    const rates = computeRates(db, provider, key, fromMs, toMs).view;
+    const cur = best.get(r.plan!);
+    if (!cur || rates.overall.totalDeltaPct > cur.rates.overall.totalDeltaPct) best.set(r.plan!, { plan: r.plan!, fromMs, toMs, observations: r.obs.length, rates });
+  }
+  const order = (p: string): number => {
+    const i = (CODEX_PLAN_ORDER as readonly string[]).indexOf(p);
+    return i < 0 ? 99 : i;
+  };
+  const plans = [...best.values()].sort((a, b) => order(a.plan) - order(b.plan));
+  view.plans = plans.map((p) => ({ plan: p.plan, fromMs: p.fromMs, toMs: p.toMs, observations: p.observations, totalDeltaPct: p.rates.overall.totalDeltaPct, nominal: CODEX_NOMINAL_MULTIPLE[p.plan] ?? null }));
+  if (plans.length < 2) return { ...view, unavailable: 'one_plan' };
+  const base = plans[0]!;
+  view.basePlan = base.plan;
+  const usable = (g: GroupRateView): boolean => g.pctPerMTokens != null && g.status !== 'insufficient';
+  const baseGroups = new Map(base.rates.groups.filter(usable).map((g) => [g.group, g]));
+  const bestOf = new Map<string, { group: string; ratio: Band; width: number }[]>();
+  for (const [group, bg] of baseGroups) {
+    const byPlan: PlanCompareView['groups'][number]['byPlan'] = [];
+    for (const p of plans.slice(1)) {
+      const g = p.rates.groups.find((x) => x.group === group && usable(x));
+      if (!g) continue;
+      const b = bg.pctPerMTokens!;
+      const o = g.pctPerMTokens!;
+      const ratio: Band = { mid: b.mid / o.mid, low: b.low / Math.max(o.high, 1e-12), high: b.high / Math.max(o.low, 1e-12) };
+      byPlan.push({ plan: p.plan, pctPerMTokens: o, ratio, status: g.status === 'measured' && bg.status === 'measured' ? 'measured' : 'tentative' });
+      // 集計には、両方のプランで「実測」のものだけを使う（暫定の値は誤差が大きく、中央値を乱すため）
+      if (g.status === 'measured' && bg.status === 'measured') bestOf.set(p.plan, [...(bestOf.get(p.plan) ?? []), { group, ratio, width: Math.log(Math.max(ratio.high, 1e-9) / Math.max(ratio.low, 1e-9)) }]);
+    }
+    if (byPlan.length > 0) view.groups.push({ group, base: bg.pctPerMTokens!, byPlan });
+  }
+  if (view.groups.length === 0) return { ...view, unavailable: 'no_common_group' };
+  view.groups.sort((a, b) => (b.byPlan.filter((x) => x.status === 'measured').length - a.byPlan.filter((x) => x.status === 'measured').length) || a.group.localeCompare(b.group));
+  for (const [plan, rs] of bestOf) {
+    const best = [...rs].sort((x, y) => x.width - y.width)[0]!;
+    view.summary.push({ plan, bestGroup: best.group, best: best.ratio, measuredGroups: rs.length, nominal: CODEX_NOMINAL_MULTIPLE[plan] ?? null });
+  }
+  view.summary.sort((a, b) => order(a.plan) - order(b.plan));
+  return view;
 }

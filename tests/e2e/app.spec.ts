@@ -164,6 +164,22 @@ test.describe('Token Calendar', () => {
     expect(readFileSync(settingsPath, 'utf8')).toBe(before);
   });
 
+  test('データ元: 課金区分を変えると、変更中は操作を止め、終わったら選んだ値のまま残る', async () => {
+    env = makeEnv(true);
+    ({ app, page } = await launch(env));
+    await page.getByRole('button', { name: /データ元/ }).click();
+    const row = page.locator('tbody tr').filter({ hasText: 'Claude Code' }).first();
+    const select = row.getByLabel('課金区分');
+    await expect(select).toHaveValue('unknown', { timeout: 20000 });
+    await select.selectOption('subscription');
+    // 変更が終わると、選んだ値のまま操作できる状態に戻る（元の値へ戻って見えない）
+    await expect(select).toBeEnabled({ timeout: 20000 });
+    await expect(select).toHaveValue('subscription');
+    // 少し待っても元に戻らない（状態を読み直した結果も同じ）
+    await page.waitForTimeout(1500);
+    await expect(select).toHaveValue('subscription');
+  });
+
   test('R: データが無い環境では空の状態を示し、デモ表示は明示する', async () => {
     env = makeEnv(false);
     ({ app, page } = await launch(env));
