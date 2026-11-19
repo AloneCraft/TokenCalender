@@ -1,0 +1,57 @@
+# v から始まるタグ（例: v0.2.0）をプッシュすると、Windows 用インストーラーを作って GitHub のリリースに載せる。
+# 使い方: package.json の version を上げてコミットし、`git tag v0.2.0` → `git push origin v0.2.0`
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: タグと package.json の版が一致するか確かめる
+        shell: bash
+        run: |
+          pkg="v$(node -p "require('./package.json').version")"
+          if [ "$pkg" != "$GITHUB_REF_NAME" ]; then
+            echo "タグ $GITHUB_REF_NAME と package.json の版 $pkg が違います" >&2
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+      - name: インストーラーを作る
+        run: npm run dist:win
+
+      - name: ハッシュ（SHA-256）を作る
+        shell: bash
+        working-directory: release
+        run: sha256sum Token-Calendar-Setup-*.exe > SHA256SUMS.txt
+
+      - name: リリースを作って載せる
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            release/Token-Calendar-Setup-*.exe release/SHA256SUMS.txt \
+            --title "Token Calendar $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
