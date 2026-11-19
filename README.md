@@ -7,9 +7,9 @@ Claude Code と OpenAI Codex の使用量をローカルのログから集計し
 
 ## ダウンロード
 
-**[最新版を入手する（Releases）](https://github.com/AloneCraft/TokenCalender/releases/latest)**: Windows 用インストーラー `Token Calendar Setup x.y.z.exe`
+**[最新版を入手する（Releases）](https://github.com/AloneCraft/TokenCalender/releases/latest)**: Windows 用インストーラー `Token-Calendar-Setup-x.y.z.exe`
 
-1. Releases の「Assets」から `Token Calendar Setup x.y.z.exe` をダウンロードして実行する
+1. Releases の「Assets」から `Token-Calendar-Setup-x.y.z.exe` をダウンロードして実行する
 2. インストール先を選んで進める（管理者権限は不要）
 3. 「Windows によって PC が保護されました」と出た場合は、「詳細情報」→「実行」を選ぶ。コード署名をしていないための表示
 

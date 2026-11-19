@@ -4,7 +4,7 @@ title: Token Calendar 説明書
 
 [English](en/) ・ [GitHub リポジトリ](https://github.com/AloneCraft/TokenCalender) ・ [**ダウンロード（Windows）**](https://github.com/AloneCraft/TokenCalender/releases/latest)
 
-> インストール: Releases から `Token Calendar Setup x.y.z.exe` を取得して実行します。「Windows によって PC が保護されました」と出たら、「詳細情報」→「実行」を選びます（コード署名をしていないための表示です）。
+> インストール: Releases から `Token-Calendar-Setup-x.y.z.exe` を取得して実行します。「Windows によって PC が保護されました」と出たら、「詳細情報」→「実行」を選びます（コード署名をしていないための表示です）。
 
 Token Calendar は、Claude Code と OpenAI Codex の**サブスクの利用枠を、上限ぎりぎりまで無駄なく使う**ためのデスクトップアプリです。手元のログと公式の利用率から、次のことに答えます。
 
