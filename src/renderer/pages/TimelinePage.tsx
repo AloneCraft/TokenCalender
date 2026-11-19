@@ -122,6 +122,7 @@ export function TimelinePage() {
           <div className="legend">
             <span>{t('tl.legendObserved')}</span>
             <span>{t('tl.legendEstimated')}</span>
+            <span>{t('tl.legendBands')}</span>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
 import type { EventRow } from '../../src/db/readRepo.ts';
 import { aggregateBuckets, cumulativeWithinCycles, PrefixSum, usageByCycle } from '../../src/core/aggregate/series.ts';
-import { buildCycles, type Cycle } from '../../src/core/quota/cycles.ts';
+import { buildCycles, cycleBands, type Cycle } from '../../src/core/quota/cycles.ts';
 import { bucketIndexOf, calendarWeekBuckets, dayBuckets, fixedBuckets, nDayBuckets } from '../../src/core/time/periods.ts';
 import type { QuotaObservation } from '../../src/core/model/types.ts';
 
@@ -195,6 +195,30 @@ describe('周期の組み立て', () => {
     expect(c).toHaveLength(2);
     expect(c.every((x) => x.basis === 'observed')).toBe(true);
     expect(c[1]!.startMs).toBe(c[0]!.endMs);
+  });
+
+  it('7日未満で打ち切られた観測済みの周期だけを前倒しリセットとし、7日ちょうど・時刻の揺れ・推定周期は前倒しにしない', () => {
+    const o = [
+      obs('2026-10-26T00:00', 10, '2026-11-02T00:00'),
+      obs('2026-11-02T01:00', 10, '2026-11-09T00:00'),
+      // 11/6 に早いリセット（4日目で打ち切り）
+      obs('2026-11-06T06:00', 2, '2026-11-13T00:00'),
+    ];
+    const cycles = buildCycles(o, 10080, { extrapolateToMs: Date.parse('2026-11-30T00:00Z') });
+    const bands = cycleBands(cycles, 10080, Date.parse('2026-10-26T00:00Z'), Date.parse('2026-11-30T00:00Z'));
+    const early = bands.filter((b) => b.early);
+    expect(early).toHaveLength(1);
+    expect((early[0]!.endMs - early[0]!.startMs) / 86400000).toBeLessThan(7);
+    expect(bands.filter((b) => !b.early && !b.estimated).length).toBeGreaterThan(0);
+    expect(bands.filter((b) => b.estimated).every((b) => !b.early)).toBe(true);
+    // 期間外の周期は含めない
+    expect(cycleBands(cycles, 10080, Date.parse('2026-11-20T00:00Z'), Date.parse('2026-11-30T00:00Z')).every((b) => b.endMs > Date.parse('2026-11-20T00:00Z'))).toBe(true);
+  });
+
+  it('リセット時刻が数分ずれただけの周期は前倒しにしない', () => {
+    const o = [obs('2026-11-01T00:00', 10, '2026-11-01T14:54'), obs('2026-11-03T00:00', 20, '2026-11-08T14:48')];
+    const bands = cycleBands(buildCycles(o, 10080), 10080, 0, Date.parse('2027-01-01T00:00Z'));
+    expect(bands.some((b) => b.early)).toBe(false);
   });
 
   it('観測の無い期間の周期は推定として区別する', () => {

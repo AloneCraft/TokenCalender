@@ -7,7 +7,7 @@ import { AGG_BUCKET_MS, getSetting, loadEventAggregates, listWindows, loadEvents
 import { PricingEngine, type PricingMode } from '../core/pricing/engine.ts';
 import type { PriceEntry } from '../core/pricing/table.ts';
 import { aggregateBuckets, cumulativeWithinCycles, PrefixSum, usageByCycle, type Dimension, type Measure } from '../core/aggregate/series.ts';
-import { buildCycles, parseWindowKey, windowKey, type Cycle } from '../core/quota/cycles.ts';
+import { buildCycles, cycleBands, parseWindowKey, windowKey, type Cycle } from '../core/quota/cycles.ts';
 import { bucketStats, boundarySet, dimValues, IntervalPrefix, statValue } from './intervals.ts';
 import { addStats, intervalStats, zeroStats, type DimSql, type IntervalStats } from '../db/readRepo.ts';
 import { calendarWeekBuckets, dayBuckets, fixedBuckets, monthGridStart, nDayBuckets, todayIn, type Bucket } from '../core/time/periods.ts';
@@ -362,7 +362,7 @@ export class QueryService {
       }
     }
     if (buckets.length === 0) {
-      return { buckets: [], dimensionKeys: [], periodTotal: 0, periodUnpricedTokens: 0, fiveHourBasis, resets: [], windowLabel: null, demo: this.demo };
+      return { buckets: [], dimensionKeys: [], periodTotal: 0, periodUnpricedTokens: 0, fiveHourBasis, resets: [], cycles: [], windowLabel: null, demo: this.demo };
     }
     const fromMs = buckets[0]!.startMs;
     const toMs = buckets[buckets.length - 1]!.endMs;
@@ -399,6 +399,7 @@ export class QueryService {
         periodUnpricedTokens: tb.reduce((sum, b) => sum + b.unpricedTokens, 0),
         fiveHourBasis,
         resets: (win?.cycles ?? []).filter((c) => c.startMs > fromMs && c.startMs < toMs).map((c) => ({ atMs: c.startMs, estimated: !observedEndsI.has(c.startMs) })),
+        cycles: win ? cycleBands(win.cycles, win.parts.windowMinutes ?? 0, fromMs, toMs) : [],
         windowLabel: win?.label ?? null,
         demo: this.demo,
       };
@@ -435,6 +436,7 @@ export class QueryService {
       resets: (win?.cycles ?? [])
         .filter((c) => c.startMs > fromMs && c.startMs < toMs)
         .map((c) => ({ atMs: c.startMs, estimated: !observedEnds.has(c.startMs) })),
+      cycles: win ? cycleBands(win.cycles, win.parts.windowMinutes ?? 0, fromMs, toMs) : [],
       windowLabel: win?.label ?? null,
       demo: this.demo,
     };

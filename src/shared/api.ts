@@ -121,6 +121,8 @@ export interface TimelineResponse {
   /** 5時間刻みの区切りの根拠 */
   fiveHourBasis: 'official' | 'analytic' | null;
   resets: { atMs: number; estimated: boolean }[];
+  /** リセットからリセットまでの周期（グラフの帯）。early = 予定より早いリセットで打ち切られた周期 */
+  cycles: { startMs: number; endMs: number; estimated: boolean; early: boolean }[];
   windowLabel: string | null;
   demo: boolean;
 }

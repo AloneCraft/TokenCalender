@@ -127,6 +127,30 @@ export function buildCycles(
   return out;
 }
 
+/** 前倒しとみなす短さの下限。枠の長さからこれ以上短い観測済みの周期だけを前倒しリセットとする（リセット時刻の揺れを除くため）。 */
+const EARLY_TOLERANCE_MS = 60 * 60 * 1000;
+
+/** 画面に渡す周期の帯。early = 公式に観測した周期が、予定より早い次のリセットで打ち切られた。 */
+export interface CycleBand {
+  startMs: number;
+  endMs: number;
+  estimated: boolean;
+  early: boolean;
+}
+
+/** 期間と重なる周期を、画面向けの帯にする。前倒し判定は観測済みの周期だけで行い、推定周期は使わない。 */
+export function cycleBands(cycles: Cycle[], windowMinutes: number, fromMs: number, toMs: number): CycleBand[] {
+  const W = windowMinutes * 60 * 1000;
+  return cycles
+    .filter((c) => c.endMs > fromMs && c.startMs < toMs)
+    .map((c) => ({
+      startMs: c.startMs,
+      endMs: c.endMs,
+      estimated: c.basis !== 'observed',
+      early: c.basis === 'observed' && c.truncated && c.endMs - c.startMs < W - EARLY_TOLERANCE_MS,
+    }));
+}
+
 function extrapolated(startMs: number, endMs: number): Cycle {
   return { startMs, endMs, basis: 'extrapolated', truncated: false, firstObservedAt: null, lastObservedAt: null, maxUsedPercent: null };
 }
