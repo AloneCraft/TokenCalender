@@ -1,5 +1,7 @@
 # Token Calendar
 
+[English](README.en.md) | **日本語**
+
 **📖 説明書: https://alonecraft.github.io/TokenCalender/** ・ **User guide (English): https://alonecraft.github.io/TokenCalender/en/**
 
 Claude Code と OpenAI Codex の使用量をローカルのログから集計し、カレンダーとチャートで表示するデスクトップアプリ。
